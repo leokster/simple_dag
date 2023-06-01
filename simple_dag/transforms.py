@@ -4,9 +4,9 @@ from importlib import import_module
 from pathlib import Path
 from typing import Callable, List
 
-from simple_pipeline.datahandlers.binary_handler import BinaryInput, BinaryOutput
-from simple_pipeline.datahandlers.pandas_handler import PandasDFInput, PandasDFOutput
-from simple_pipeline.datahandlers.spark_handler import SparkDFInput, SparkDFOutput
+from simple_dag.datahandlers.binary_handler import BinaryInput, BinaryOutput
+from simple_dag.datahandlers.pandas_handler import PandasDFInput, PandasDFOutput
+from simple_dag.datahandlers.spark_handler import SparkDFInput, SparkDFOutput
 
 try:
     from pyspark.sql import SparkSession
@@ -48,12 +48,23 @@ def get_spark():
 
 class Transform:
     compute_func: Callable = None
-    cron: List[str] = []
+    on_upstream_success: bool = False
 
     def __init__(self, compute_func, *args, **kwargs) -> None:
         self.compute_func = compute_func
         self.args = args
         self.kwargs = kwargs
+
+    @property
+    def cron(self):
+        if not hasattr(self, "_cron"):
+            return []
+        return self._cron
+    
+    def set_cron(self, cron: str):
+        if not hasattr(self, "_cron"):
+            self._cron = []
+        self._cron.append(cron)
 
     def compute(self, ctx):
         parsed_args = self.args
@@ -110,12 +121,14 @@ def transform(*args, **kwargs):
     return _inner
 
 
-def schedule(cron):
-    def _inner(obj):
+def schedule(cron: str = None, on_upstream_success: bool = False):
+    def _inner(obj: Transform):
         if not isinstance(obj, Transform):
             raise ValueError("schedule decorator can only be used on Transform objects")
-
-        obj.cron.append(cron)
+        if cron:
+            obj.set_cron(cron)
+        if on_upstream_success:
+            obj.on_upstream_success = on_upstream_success
         return obj
 
     return _inner

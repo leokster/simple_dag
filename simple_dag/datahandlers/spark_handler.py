@@ -1,4 +1,4 @@
-from simple_pipeline.datahandlers import base_handler
+from simple_dag.datahandlers import base_handler
 
 try:
     from pyspark.sql import SparkSession

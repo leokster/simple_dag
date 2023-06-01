@@ -1,9 +1,21 @@
 import os
 
-from dagster import MetadataValue, asset, AssetIn, SourceAsset
+from dagster import (
+    asset,
+    SourceAsset,
+    FreshnessPolicy,
+    AutoMaterializePolicy,
+    ExperimentalWarning
+)
 
-from simple_pipeline.datahandlers.base_handler import ABCInput, ABCOutput
-from simple_pipeline.transforms import find_transform_instances_in_folder
+from simple_dag.datahandlers.base_handler import ABCInput, ABCOutput
+from simple_dag.transforms import find_transform_instances_in_folder, Transform
+
+import logging
+import warnings
+
+warnings.filterwarnings("ignore", category=ExperimentalWarning)
+
 
 PATH_TO_NICE_NAME = {}
 PATH_TO_DESCRIPTION = {}
@@ -19,15 +31,15 @@ def _dataset_name_from_path(path):
     )
 
 
-def get_asset_description(path):
+def _get_asset_description(path):
     return PATH_TO_DESCRIPTION.get(path, "") + "\n\n" + f"Path: {path}"
 
 
-def get_asset_name(path):
+def _get_asset_name(path):
     return PATH_TO_NICE_NAME.get(path, _dataset_name_from_path(path))
 
 
-def generate_static_assets(inputs, outputs):
+def _generate_static_assets(inputs, outputs):
     input_paths = [x.path for x in inputs]
     output_paths = [x.path for x in outputs]
 
@@ -39,15 +51,15 @@ def generate_static_assets(inputs, outputs):
     for name in static_assets_paths:
         assets.append(
             SourceAsset(
-                key=get_asset_name(name),
-                description=get_asset_description(name),
+                key=_get_asset_name(name),
+                description=_get_asset_description(name),
             )
         )
 
     return assets
 
 
-def generate_dagster_asset(transformer):
+def _generate_dagster_asset(transformer: Transform):
     inputs = {
         key: val for key, val in transformer.kwargs.items() if isinstance(val, ABCInput)
     }
@@ -65,21 +77,62 @@ def generate_dagster_asset(transformer):
 
     output = list(outputs.values())[0]
 
-    print("Asset: ", get_asset_name(output.path))
+    print("Asset: ", _get_asset_name(output.path))
+
+    freshness_policy = None
+    auto_materialize_policy = None
+
+    if transformer.on_upstream_success:
+        auto_materialize_policy = AutoMaterializePolicy.eager()
+
+    if transformer.cron:
+        freshness_policy = FreshnessPolicy(
+            maximum_lag_minutes=1,
+            cron_schedule=transformer.cron[0],
+        )
+        if auto_materialize_policy is None:
+            auto_materialize_policy = AutoMaterializePolicy.lazy()
 
     @asset(
-        name=get_asset_name(output.path),
-        non_argument_deps={get_asset_name(val.path) for _, val in inputs.items()},
-        description=get_asset_description(output.path),
+        name=_get_asset_name(output.path),
+        non_argument_deps={_get_asset_name(val.path) for _, val in inputs.items()},
+        description=_get_asset_description(output.path),
+        freshness_policy=freshness_policy,
+        auto_materialize_policy=auto_materialize_policy,
     )
     def asset_fn(**kwargs) -> None:
         transformer()
 
     return asset_fn
 
+def build_dagster_from_folder(transforms_folder):
+    """
+    Builds a dagster pipeline from a folder containing transform files.
 
-def get_dagster_assets(transforms_folder):
+    The function is looking for functions which are decorated with `@simple_dag.transform`
+    and builds a dagster pipeline from them.
+
+    Args:
+        transforms_folder (str): Path to the folder containing the transform files.
+    
+    Returns:
+        tuple: Tuple of asset functions and static assets.
+    """
     all_transforms = find_transform_instances_in_folder(transforms_folder)
+    return build_dagster(all_transforms)
+
+
+
+def build_dagster(all_transforms):
+    """
+    Builds a dagster pipeline from a list of transform instances.
+
+    Args:
+        all_transforms (list): List of transform instances.
+
+    Returns:
+        tuple: Tuple of asset functions and static assets.
+    """
 
     asset_fns = []
     inputs = []
@@ -108,7 +161,8 @@ def get_dagster_assets(transforms_folder):
                     PATH_TO_NICE_NAME[val.path] = val.name
 
     for transform in all_transforms:
-        asset_fns.append(generate_dagster_asset(transform))
+        asset_fn = _generate_dagster_asset(transform)
+        asset_fns.append(asset_fn)
         inputs += [
             val for _, val in transform.kwargs.items() if isinstance(val, ABCInput)
         ]
@@ -116,5 +170,5 @@ def get_dagster_assets(transforms_folder):
             val for _, val in transform.kwargs.items() if isinstance(val, ABCOutput)
         ]
 
-    static_assets = generate_static_assets(inputs, outputs)
+    static_assets = _generate_static_assets(inputs, outputs)
     return asset_fns, static_assets

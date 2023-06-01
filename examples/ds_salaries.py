@@ -1,4 +1,4 @@
-from simple_pipeline import transform, PandasDFInput, PandasDFOutput, BinaryOutput
+from simple_dag import transform, PandasDFInput, PandasDFOutput, BinaryOutput, schedule
 import os
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -10,7 +10,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 def check_salary(df):
     return "salary" in df.columns
 
-
+@schedule("0 * * * *")
 @transform(
     df=PandasDFInput(
         os.path.join(BASE_DIR, "data/raw/ds_salaries.csv"),
@@ -28,7 +28,7 @@ def create_2023_salaries(df, output: PandasDFOutput):
     df = df[df["work_year"] == 2023]
     output.write_data(df, index=False)
 
-
+@schedule(on_upstream_success=True)
 @transform(
     df=PandasDFInput(
         os.path.join(BASE_DIR, "data/curated/ds_salaries_2023.csv"),
@@ -43,7 +43,7 @@ def create_2023_salaries_ES(df, output: PandasDFOutput):
     df = df[df["company_location"] == "ES"]
     output.write_data(df, index=False)
 
-
+@schedule(on_upstream_success=True)
 @transform(
     df=PandasDFInput(
         os.path.join(BASE_DIR, "data/curated/ds_salaries_2023.csv"), sep=","
@@ -57,7 +57,7 @@ def create_2023_salaries_US(df, output: PandasDFOutput):
     df = df[df["company_location"] == "ES"]
     output.write_data(df, index=False)
 
-
+@schedule(on_upstream_success=True)
 @transform(
     df1=PandasDFInput(
         os.path.join(BASE_DIR, "data/curated/ds_salaries_2023_US.csv"), sep=","
@@ -74,13 +74,14 @@ def create_2023_salaries_ES_US(df1, df2, output: PandasDFOutput):
     df = pd.concat([df1, df2])
     output.write_data(df, index=False)
 
-
+@schedule(on_upstream_success=True)
 @transform(
     df=PandasDFInput(
         os.path.join(BASE_DIR, "data/curated/ds_salaries_2023_US_ES.csv"), sep=","
     ),
     image=BinaryOutput(
-        os.path.join(BASE_DIR, "data/curated/ds_salaries_2023_US_ES.png")
+        os.path.join(BASE_DIR, "data/curated/ds_salaries_2023_US_ES.png"),
+        name="salerie_plot",
     ),
 )
 def create_2023_salaries_ES_US_plot(df, image: BinaryOutput):
@@ -93,6 +94,7 @@ def create_2023_salaries_ES_US_plot(df, image: BinaryOutput):
     image.write_data(buf.read())
 
 
+@schedule(on_upstream_success=True)
 @transform(
     df=PandasDFInput(
         os.path.join(BASE_DIR, "data/curated/ds_salaries_2023.csv"), sep=","
@@ -100,17 +102,19 @@ def create_2023_salaries_ES_US_plot(df, image: BinaryOutput):
     output=PandasDFOutput(
         os.path.join(BASE_DIR, "data/curated/ds_salaries_2023_remove_salery.csv"),
         health_checks=[check_salary],
+        name="saleries_2023_remove_salery",
     ),
 )
 def create_2023_salaries_no_salary(df, output: PandasDFOutput):
     df = df.drop(columns=["salary"])
     output.write_data(df, index=False)
 
-
+@schedule(on_upstream_success=True)
 @transform(
     output=PandasDFOutput(
         os.path.join(BASE_DIR, "data/curated/random_numbers.csv"),
         health_checks=[check_salary],
+        name="random_numbers",
     ),
 )
 def create_random_numbers(output: PandasDFOutput):

@@ -107,3 +107,6 @@ ENV/
 
 
 examples/data/curated
+
+
+.DS_Store

@@ -1,5 +1,8 @@
+import os
+
 import pandas as pd
-from simple_pipeline.datahandlers import base_handler
+
+from simple_dag.datahandlers import base_handler
 
 
 def _execute_health_checks(path, df, health_checks):
@@ -12,6 +15,11 @@ class PandasDFInput(base_handler.ABCInput):
     def __init__(
         self, path, *args, name=None, description=None, health_checks=[], **kwargs
     ) -> None:
+        """
+        Pandas Dataframe Input Handler. 
+
+        Used to read data from pandas dataframes in simple_dag transforms.
+        """
         self.path = path
         self.name = name
         self.description = description
@@ -44,4 +52,8 @@ class PandasDFOutput(base_handler.ABCOutput):
 
     def write_data(self, df, *args, **kwargs):
         _execute_health_checks(self.path, df, self.health_checks)
+
+        # create parent directories if they don't exist
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+
         df.to_csv(self.path, *args, **kwargs)

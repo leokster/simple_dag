@@ -1,1 +1,1 @@
-"""Unit test package for simple_pipeline."""
+"""Unit test package for simple_dag."""

@@ -2,6 +2,9 @@
 Usage
 =====
 
-To use simple_pipeline in a project::
+Let's have a look at the following example: https://github.com/leokster/simple_dag/blob/main/examples/ds_salaries.py
 
-    import simple_pipeline
+.. literalinclude:: ../examples/ds_salaries.py
+    :language: python
+    :linenos:
+    :lines: 1-100

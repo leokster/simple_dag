@@ -1,4 +1,4 @@
-* simple_pipeline version:
+* simple_dag version:
 * Python version:
 * Operating System:
 

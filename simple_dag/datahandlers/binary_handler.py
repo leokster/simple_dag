@@ -1,4 +1,4 @@
-from simple_pipeline.datahandlers import base_handler
+from simple_dag.datahandlers import base_handler
 
 
 class BinaryInput(base_handler.ABCInput):

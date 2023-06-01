@@ -1,6 +1,3 @@
-from abc import ABC, abstractmethod
-
-
 class ABCInput:
     path = None
     name = None

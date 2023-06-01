@@ -48,9 +48,9 @@ clean-test: ## remove test and coverage artifacts
 	rm -fr .pytest_cache
 
 lint/flake8: ## check style with flake8
-	flake8 simple_pipeline tests
+	flake8 simple_dag tests
 lint/black: ## check style with black
-	black --check simple_pipeline tests
+	black --check simple_dag tests
 
 lint: lint/flake8 lint/black ## check style
 
@@ -61,18 +61,17 @@ test-all: ## run tests on every Python version with tox
 	tox
 
 coverage: ## check code coverage quickly with the default Python
-	coverage run --source simple_pipeline -m pytest
+	coverage run --source simple_dag -m pytest
 	coverage report -m
 	coverage html
 	$(BROWSER) htmlcov/index.html
 
 docs: ## generate Sphinx HTML documentation, including API docs
-	rm -f docs/simple_pipeline.rst
-	rm -f docs/modules.rst
-	sphinx-apidoc -o docs/ simple_pipeline
+	export SPHINX_APIDOC_OPTIONS=inheritated-members
 	$(MAKE) -C docs clean
-	$(MAKE) -C docs html
+	$(MAKE) -C docs html SPHINXOPTS="-W"
 	$(BROWSER) docs/_build/html/index.html
+
 
 servedocs: docs ## compile the docs watching for changes
 	watchmedo shell-command -p '*.rst' -c '$(MAKE) -C docs html' -R -D .
@@ -81,8 +80,7 @@ release: dist ## package and upload a release
 	twine upload dist/*
 
 dist: clean ## builds source and wheel package
-	python setup.py sdist
-	python setup.py bdist_wheel
+	python3 -m build
 	ls -l dist
 
 install: clean ## install the package to the active Python's site-packages

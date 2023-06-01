@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-"""Tests for `simple_pipeline` package."""
+"""Tests for `simple_dag` package."""
 
 import pytest
 
 from click.testing import CliRunner
 
-from simple_pipeline import simple_pipeline
-from simple_pipeline import cli
+from simple_dag import simple_dag
+from simple_dag import cli
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def test_command_line_interface():
     runner = CliRunner()
     result = runner.invoke(cli.main)
     assert result.exit_code == 0
-    assert 'simple_pipeline.cli.main' in result.output
+    assert 'simple_dag.cli.main' in result.output
     help_result = runner.invoke(cli.main, ['--help'])
     assert help_result.exit_code == 0
     assert '--help  Show this message and exit.' in help_result.output
