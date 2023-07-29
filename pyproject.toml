@@ -1,11 +1,12 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=61", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "simple_dag"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Create simple Pipelines with Python"
-readme = "README.rst"
+readme = "README.md"
 license = {file = "LICENSE"}
 authors = [{name = "Tim Rohner", email = "info@timrohner.ch"}]
 keywords = ["simple_dag"]
@@ -21,10 +22,11 @@ classifiers = [
     "Programming Language :: Python :: 3.8"
 ]
 dependencies = [
-    "Click>=7.0, <=8.1.3",
-    "dagit >= 1.3.7, <= 1.3.7",
-    "dagster >= 1.3.7, <= 1.3.7",
-    "pandas >=2.0.1, <=2.0.1"
+    "Click>=7.0, <=8.1.6",
+    "dagit >= 1.3.7, <= 1.4.2",
+    "dagster >= 1.3.7, <= 1.4.2",
+    "matplotlib >=3.4.2, <=3.7.2",
+    "pandas >=2.0.1, <=2.0.3"
 ]
 
 
@@ -37,19 +39,9 @@ Source = "https://github.com/leokster/simple_dag"
 
 [project.optional-dependencies]
 dev = [
-    "pip >=19.2.3, <= 23.1.2",
-    "bump2version >=0.5.11, <= 1.0.1",
-    "wheel >=0.33.6, <= 0.40.0",
-    "watchdog >=0.9.0, <= 3.0.0",
-    "flake8 >=3.7.8, <= 3.7.8",
+    "black >=21.7b0, <= 23.3.0",
     "tox >=3.14.0, <= 4.5.1",
-    "coverage >=4.5.4, <= 7.2.5",
-    "Sphinx >=1.8.5, <= 6.2.1",
-    "sphinx-rtd-theme >= 1.2.0, <= 1.2.0",
-    "twine >=1.14.0, <= 1.14.0",
-    "Click >=7.1.2, <= 8.1.3",
-    "pytest >=6.2.4, <= 7.3.1",
-    "black >=21.7b0, <= 23.3.0"
+    "twine >=1.14.0, <= 1.14.0"
 ]
 
 

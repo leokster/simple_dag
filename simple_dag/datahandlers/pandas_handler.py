@@ -16,7 +16,7 @@ class PandasDFInput(base_handler.ABCInput):
         self, path, *args, name=None, description=None, health_checks=[], **kwargs
     ) -> None:
         """
-        Pandas Dataframe Input Handler. 
+        Pandas Dataframe Input Handler.
 
         Used to read data from pandas dataframes in simple_dag transforms.
         """
@@ -40,7 +40,7 @@ class PandasDFInput(base_handler.ABCInput):
 
             return df
 
-        raise ValueError(f"File extension not supported: {self.path}")
+        raise ValueError(f"File extension not supported: {self.path}, only .csv")
 
 
 class PandasDFOutput(base_handler.ABCOutput):

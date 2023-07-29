@@ -17,6 +17,10 @@ class SparkDFInput(base_handler.ABCInput):
         self.name = name
         self.description = description
 
+        Warning(
+            "Experimental: SparkDFInput is experimental and might change in the future."
+        )
+
     def get_data(self, spark: "SparkSession"):
         if self.path.endswith(".json"):
             return spark.read.option("multiLine", "true").json(self.path)

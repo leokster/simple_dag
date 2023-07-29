@@ -60,7 +60,7 @@ class Transform:
         if not hasattr(self, "_cron"):
             return []
         return self._cron
-    
+
     def set_cron(self, cron: str):
         if not hasattr(self, "_cron"):
             self._cron = []

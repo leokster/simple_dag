@@ -1,1 +1,4 @@
-.. include:: ../README.rst
+Simple DAG
+==========
+
+.. ../README.md

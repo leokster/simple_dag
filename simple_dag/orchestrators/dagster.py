@@ -5,7 +5,7 @@ from dagster import (
     SourceAsset,
     FreshnessPolicy,
     AutoMaterializePolicy,
-    ExperimentalWarning
+    ExperimentalWarning,
 )
 
 from simple_dag.datahandlers.base_handler import ABCInput, ABCOutput
@@ -105,6 +105,7 @@ def _generate_dagster_asset(transformer: Transform):
 
     return asset_fn
 
+
 def build_dagster_from_folder(transforms_folder):
     """
     Builds a dagster pipeline from a folder containing transform files.
@@ -114,13 +115,12 @@ def build_dagster_from_folder(transforms_folder):
 
     Args:
         transforms_folder (str): Path to the folder containing the transform files.
-    
+
     Returns:
         tuple: Tuple of asset functions and static assets.
     """
     all_transforms = find_transform_instances_in_folder(transforms_folder)
     return build_dagster(all_transforms)
-
 
 
 def build_dagster(all_transforms):
@@ -154,7 +154,7 @@ def build_dagster(all_transforms):
                             for key, value in PATH_TO_NICE_NAME.items()
                             if value == val.name
                         ]
-                        if val.name != potential_collision[0]:
+                        if val.path != potential_collision[0]:
                             raise ValueError(
                                 f"Duplicate name {val.name} found for {val.path} and {potential_collision[0]}"
                             )

@@ -1,7 +1,7 @@
-Transforms
+Decorators
 ==========
 
 .. automodule:: simple_dag
-   :members: Transform, transform, schedule
+   :members: transform, schedule
    :undoc-members:
    :show-inheritance:
