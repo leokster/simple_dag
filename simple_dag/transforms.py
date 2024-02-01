@@ -2,11 +2,10 @@ import os
 import sys
 from importlib import import_module
 from pathlib import Path
-from typing import Callable, List
+from typing import Callable
 
-from simple_dag.datahandlers.binary_handler import BinaryInput, BinaryOutput
-from simple_dag.datahandlers.pandas_handler import PandasDFInput, PandasDFOutput
-from simple_dag.datahandlers.spark_handler import SparkDFInput, SparkDFOutput
+from simple_dag.datahandlers.spark_handler import SparkDFInput
+from simple_dag.datahandlers.base_handler import ABCInput, ABCOutput
 
 try:
     from pyspark.sql import SparkSession
@@ -78,19 +77,12 @@ class Transform:
                     )
                 parsed_kwargs[key] = val.get_data(ctx)
 
-            elif isinstance(val, SparkDFOutput):
-                parsed_kwargs[key] = val
-
-            elif isinstance(val, PandasDFInput):
+            # check ABCInput
+            elif isinstance(val, ABCInput):
                 parsed_kwargs[key] = val.get_data()
 
-            elif isinstance(val, PandasDFOutput):
-                parsed_kwargs[key] = val
-
-            elif isinstance(val, BinaryInput):
-                parsed_kwargs[key] = val.get_data()
-
-            elif isinstance(val, BinaryOutput):
+            # check ABCOutput
+            elif isinstance(val, ABCOutput):
                 parsed_kwargs[key] = val
 
         if "ctx" in self.compute_func.__code__.co_varnames:

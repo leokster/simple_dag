@@ -3,7 +3,7 @@ class ABCInput:
     name = None
     description = None
 
-    def read_data(self):
+    def get_data(self):
         pass
 
 
