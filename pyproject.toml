@@ -39,7 +39,7 @@ Source = "https://github.com/leokster/simple_dag"
 
 [project.optional-dependencies]
 dev = [
-    "black >=21.7b0, <= 23.3.0",
+    "black >= 21.7b0, <= 24.2.0",
     "tox >=3.14.0, <= 4.5.1",
     "twine >=1.14.0, <= 4.0.2"
 ]
