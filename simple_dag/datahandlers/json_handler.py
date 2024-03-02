@@ -1,6 +1,6 @@
 import json
 from typing import Type
-import fsspec
+from simple_dag.utils import fsspec
 
 from pydantic import BaseModel
 

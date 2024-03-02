@@ -1,4 +1,5 @@
 from simple_dag.datahandlers import base_handler
+from simple_dag.utils import fsspec
 
 
 class BinaryInput(base_handler.ABCInput):
@@ -12,7 +13,7 @@ class BinaryInput(base_handler.ABCInput):
         self.kwargs = kwargs
 
     def get_data(self):
-        with open(self.path, "rb") as f:
+        with fsspec.open(self.path, mode="rb") as f:
             return f.read()
 
 
@@ -23,5 +24,5 @@ class BinaryOutput(base_handler.ABCOutput):
         self.description = description
 
     def write_data(self, data):
-        with open(self.path, "wb") as f:
+        with fsspec.open(self.path, mode="wb") as f:
             f.write(data)

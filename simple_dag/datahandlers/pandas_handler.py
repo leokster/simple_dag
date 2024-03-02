@@ -3,6 +3,7 @@ import os
 import pandas as pd
 
 from simple_dag.datahandlers import base_handler
+from simple_dag.utils import fsspec
 
 
 def _execute_health_checks(path, df, health_checks):
@@ -34,7 +35,8 @@ class PandasDFInput(base_handler.ABCInput):
                 for key, val in self.kwargs.items()
                 if key in pd.read_csv.__code__.co_varnames
             }
-            df = pd.read_csv(self.path, **pd_read_csv_kwargs)
+            with fsspec.open(self.path, "r") as f:
+                df = pd.read_csv(f, **pd_read_csv_kwargs)
 
             _execute_health_checks(self.path, df, self.health_checks)
 
@@ -56,4 +58,5 @@ class PandasDFOutput(base_handler.ABCOutput):
         # create parent directories if they don't exist
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
 
-        df.to_csv(self.path, *args, **kwargs)
+        with fsspec.open(self.path, "w") as f:
+            df.to_csv(f, *args, **kwargs)

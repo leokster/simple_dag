@@ -10,6 +10,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 def check_salary(df):
     return "salary" in df.columns
 
+
 @schedule("0 * * * *")
 @transform(
     df=PandasDFInput(
@@ -28,6 +29,7 @@ def create_2023_salaries(df, output: PandasDFOutput):
     df = df[df["work_year"] == 2023]
     output.write_data(df, index=False)
 
+
 @schedule(on_upstream_success=True)
 @transform(
     df=PandasDFInput(
@@ -43,6 +45,7 @@ def create_2023_salaries_ES(df, output: PandasDFOutput):
     df = df[df["company_location"] == "ES"]
     output.write_data(df, index=False)
 
+
 @schedule(on_upstream_success=True)
 @transform(
     df=PandasDFInput(
@@ -56,6 +59,7 @@ def create_2023_salaries_ES(df, output: PandasDFOutput):
 def create_2023_salaries_US(df, output: PandasDFOutput):
     df = df[df["company_location"] == "ES"]
     output.write_data(df, index=False)
+
 
 @schedule(on_upstream_success=True)
 @transform(
@@ -73,6 +77,7 @@ def create_2023_salaries_US(df, output: PandasDFOutput):
 def create_2023_salaries_ES_US(df1, df2, output: PandasDFOutput):
     df = pd.concat([df1, df2])
     output.write_data(df, index=False)
+
 
 @schedule(on_upstream_success=True)
 @transform(
@@ -108,6 +113,7 @@ def create_2023_salaries_ES_US_plot(df, image: BinaryOutput):
 def create_2023_salaries_no_salary(df, output: PandasDFOutput):
     df = df.drop(columns=["salary"])
     output.write_data(df, index=False)
+
 
 @schedule(on_upstream_success=True)
 @transform(
