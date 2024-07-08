@@ -55,8 +55,5 @@ class PandasDFOutput(base_handler.ABCOutput):
     def write_data(self, df, *args, **kwargs):
         _execute_health_checks(self.path, df, self.health_checks)
 
-        # create parent directories if they don't exist
-        os.makedirs(os.path.dirname(self.path), exist_ok=True)
-
         with fsspec.open(self.path, "w") as f:
             df.to_csv(f, *args, **kwargs)
