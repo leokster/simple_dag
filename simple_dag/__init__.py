@@ -11,6 +11,7 @@ from simple_dag.datahandlers.pandas_handler import (
     PandasDFOutput,
 )
 from simple_dag.datahandlers.binary_handler import BinaryInput, BinaryOutput
+from simple_dag.datahandlers.filepath_handler import PathInput
 from simple_dag.datahandlers.directory_handler import DirectoryInput, DirectoryOutput
 from simple_dag.datahandlers.json_handler import JsonInput, JsonOutput
 from simple_dag.transforms import transform, schedule, Transform
@@ -20,12 +21,13 @@ __all__ = [
     "BinaryOutput",
     "BinaryOutput",
     "DirectoryInput",
-    "Multiple",
     "DirectoryOutput",
     "JsonInput",
     "JsonOutput",
+    "Multiple",
     "PandasDFInput",
     "PandasDFOutput",
+    "PathInput",
     "schedule",
     "SparkDFInput",
     "SparkDFOutput",
