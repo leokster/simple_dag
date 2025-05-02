@@ -30,3 +30,25 @@ class Multiple(base_handler.ABCInput):
             input_objs.append(input_obj)
 
         return [input_obj.get_data() for input_obj in input_objs]
+
+
+class LengthAwareIterator:
+    def __init__(self, inputs: list[base_handler.ABCInput]):
+        self.inputs = inputs
+        self.length = len(inputs)
+
+    def __iter__(self):
+        for input_obj in self.inputs:
+            yield input_obj.get_data()
+
+    def __len__(self):
+        return self.length
+
+
+class MultipleIterator(Multiple):
+
+    def get_data(self):
+        files = fsspec.list_files(self.path)
+        inputs = [self.input_cls(file, *self.args, **self.kwargs) for file in files]
+
+        return LengthAwareIterator(inputs)

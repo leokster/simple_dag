@@ -4,7 +4,7 @@ __author__ = """Tim Rohner"""
 __email__ = "info@timrohner.ch"
 __version__ = "0.1.0"
 
-from simple_dag.datahandlers.multiple import Multiple
+from simple_dag.datahandlers.multiple import Multiple, MultipleIterator
 from simple_dag.datahandlers.spark_handler import SparkDFInput, SparkDFOutput
 from simple_dag.datahandlers.pandas_handler import (
     PandasDFInput,
@@ -25,6 +25,7 @@ __all__ = [
     "JsonInput",
     "JsonOutput",
     "Multiple",
+    "MultipleIterator",
     "PandasDFInput",
     "PandasDFOutput",
     "PathInput",
