@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=61.0.0", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,6 +10,7 @@ readme = "README.md"
 license = {file = "LICENSE"}
 authors = [{name = "Tim Rohner", email = "info@timrohner.ch"}]
 keywords = ["simple_dag"]
+requires-python = ">=3.6"
 # homepage = "https://github.com/leokster/simple_dag"
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
@@ -42,8 +43,9 @@ Source = "https://github.com/leokster/simple_dag"
 [project.optional-dependencies]
 dev = [
     "black >= 21.7b0, <= 24.4.2",
-    "tox >= 3.14.0, <= 4.25.0",
-    "twine >=1.14.0, < 6"
+    "tox >= 3.14.0, <= 4.24.1",
+    "twine >=1.14.0, < 6",
+    "build"
 ]
 
 
