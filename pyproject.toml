@@ -50,8 +50,8 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["simple_dag", "simple_dag.*"]
 
-# [tool.setuptools.package-data]
-# "*" = ["*.html"]
+[tool.setuptools.package-data]
+simple_dag = ["py.typed"]
 
 [tool.setuptools_scm]
 write_to = "simple_dag/_version.py"
