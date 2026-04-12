@@ -1,0 +1,428 @@
+# simple_dag
+
+> Orchestration-agnostic Python pipeline library. Decorate functions with @transform
+> to define DAG nodes. Inputs load data automatically; outputs are passed to the function
+> for manual write_data() calls. Transforms are plain callables — run standalone or
+> integrate with Dagster.
+
+## Install
+
+```
+pip install simple_dag
+```
+
+Requires Python 3.9+.
+
+## Core Decorators
+
+### @transform
+
+Marks a function as a pipeline node (Transform). Keyword arguments are either Input or Output instances.
+
+- Input arguments: loaded automatically; your function receives the data.
+- Output arguments: passed through unchanged; your function calls output.write_data().
+
+```python
+from simple_dag import transform, PandasDFInput, PandasDFOutput
+
+@transform(
+    df=PandasDFInput("data/raw.csv"),
+    output=PandasDFOutput("data/processed.csv"),
+)
+def my_step(df, output: PandasDFOutput):
+    output.write_data(df[df["value"] > 0], index=False)
+```
+
+Returns a Transform object that is callable directly.
+
+### @schedule
+
+Stack above @transform to attach scheduling metadata. Must be applied after @transform (outermost decorator).
+
+```python
+@schedule("0 * * * *")              # cron expression
+@transform(...)
+def hourly_step(...): ...
+
+@schedule(on_upstream_success=True) # trigger after upstream completes
+@transform(...)
+def downstream_step(...): ...
+```
+
+Parameters:
+- cron (str): A cron expression string (e.g. "0 * * * *" for hourly).
+- on_upstream_success (bool): If True, trigger when any upstream transform completes successfully.
+
+Both can be combined on the same transform by stacking multiple @schedule decorators.
+
+### Transform (class)
+
+The object returned by @transform. It is callable.
+
+- Transform.__call__(): Loads all inputs, runs the wrapped function, returns the result.
+- Transform.cron (list[str]): Cron expressions attached via @schedule.
+- Transform.on_upstream_success (bool): Whether the transform is triggered on upstream success.
+- Transform.__name__ (str): The name of the wrapped function.
+
+## Input Handlers
+
+All inputs accept path as the first argument. Paths support local filesystems and any fsspec-compatible URI (s3://, abfs://, etc.).
+
+### PandasDFInput
+
+Reads a CSV file into a pandas DataFrame.
+
+```python
+PandasDFInput(
+    path,                  # str: file path or fsspec URI
+    *args,
+    name=None,             # str: asset name for Dagster
+    description=None,      # str: asset description for Dagster
+    health_checks=[],      # list[Callable]: each receives the DataFrame, must return True
+    **kwargs               # forwarded to pd.read_csv (e.g. sep=",", dtype={"col": str})
+)
+```
+
+get_data() returns: pandas.DataFrame
+
+### BinaryInput
+
+Reads a file as raw bytes.
+
+```python
+BinaryInput(
+    path,
+    name=None,
+    description=None,
+)
+```
+
+get_data() returns: bytes
+
+### SparkDFInput (experimental)
+
+Reads a Spark DataFrame. Requires PySpark installed separately.
+
+```python
+SparkDFInput(
+    path,
+    format="parquet",      # "parquet", "json", or "csv"
+    name=None,
+    description=None,
+)
+```
+
+get_data(ctx) returns: pyspark.sql.DataFrame — requires a SparkSession passed as ctx.
+
+### JsonInput
+
+Reads a JSON file, with optional Pydantic schema validation.
+
+```python
+JsonInput(
+    path,                          # must end with .json
+    *args,
+    name=None,
+    description=None,
+    health_checks=[],
+    schema_validation=None,        # Pydantic BaseModel class for validation
+    return_pydantic_model=True,    # if True and schema_validation set, returns model instance
+    **kwargs
+)
+```
+
+get_data() returns:
+- Pydantic model instance if schema_validation is set and return_pydantic_model=True
+- dict/list if no schema_validation
+
+Raises ValueError if schema validation fails or if return_pydantic_model=True but no schema_validation provided.
+
+### PathInput
+
+Passes the raw path string to the function without loading anything.
+
+```python
+PathInput(
+    path,
+    name=None,
+    description=None,
+)
+```
+
+get_data() returns: str (the path)
+
+### DirectoryInput
+
+Validates that the path is an existing directory, then passes the path string.
+
+```python
+DirectoryInput(
+    path,
+    name=None,
+    description=None,
+)
+```
+
+get_data() returns: str (the directory path). Raises ValueError if path is not a directory.
+
+### Multiple
+
+Expands a wildcard path into a list of loaded inputs. Wraps any other Input class.
+
+```python
+Multiple(
+    input_obj   # an Input instance whose .path contains a glob wildcard
+)
+```
+
+get_data() returns: list — each element is the result of calling get_data() on one matched file.
+
+```python
+Multiple(PandasDFInput("data/raw/*.csv", sep=","))
+# returns [DataFrame, DataFrame, ...]
+```
+
+### MultipleIterator
+
+Like Multiple but returns a lazy iterator instead of a list. Memory-efficient for large file sets.
+
+```python
+MultipleIterator(input_obj)
+```
+
+get_data() returns: LengthAwareIterator — supports len() and iteration; each step calls get_data() on one file.
+
+## Output Handlers
+
+All outputs accept path as the first argument and support fsspec URIs.
+
+### PandasDFOutput
+
+Writes a pandas DataFrame to a CSV file.
+
+```python
+PandasDFOutput(
+    path,
+    name=None,
+    description=None,
+    health_checks=[],   # each receives the DataFrame before writing, must return True
+)
+```
+
+write_data(df, **kwargs): kwargs forwarded to df.to_csv().
+
+### BinaryOutput
+
+Writes raw bytes to a file.
+
+```python
+BinaryOutput(
+    path,
+    name=None,
+    description=None,
+)
+```
+
+write_data(data: bytes)
+
+### SparkDFOutput (experimental)
+
+Writes a Spark DataFrame to Parquet.
+
+```python
+SparkDFOutput(
+    path,
+    name=None,
+    description=None,
+)
+```
+
+write_data(df): calls df.write.parquet(path).
+
+### JsonOutput
+
+Writes a dict, list, or Pydantic model to a JSON file.
+
+```python
+JsonOutput(
+    path,
+    name=None,
+    description=None,
+    health_checks=[],
+    schema_validation=None,
+)
+```
+
+write_data(data): accepts dict, list, or pydantic.BaseModel. Pydantic models are serialized with model_dump(). Raises ValueError for unsupported types.
+
+### DirectoryOutput
+
+Holds a directory path. Does not write anything itself — use .path directly in your function.
+
+```python
+DirectoryOutput(
+    path,
+    name=None,
+    description=None,
+)
+```
+
+write_data() raises NotImplementedError. Access the path via output.path.
+
+## Health Checks
+
+A health check is any callable that accepts a single argument (the loaded data or data about to be written) and returns True if the check passes.
+
+```python
+def has_salary_col(df):
+    return "salary" in df.columns
+
+PandasDFInput("data.csv", health_checks=[has_salary_col])
+PandasDFOutput("out.csv", health_checks=[has_salary_col])
+```
+
+A failed health check raises: ValueError: "Health check failed for <path>: <function_name>"
+
+Health checks run:
+- For inputs: after data is loaded, before it is passed to the function.
+- For outputs: before the data is written to disk.
+
+## Direct Execution
+
+Transforms are plain Python callables. Call them directly without Dagster:
+
+```python
+my_transform()
+```
+
+This loads all inputs, runs the function, and writes all outputs.
+
+### find_transform_instances_in_folder
+
+Discovers all Transform instances defined in Python files within a directory tree.
+
+```python
+from simple_dag.transforms import find_transform_instances_in_folder
+
+transforms = find_transform_instances_in_folder("my_pipeline/")
+for t in transforms:
+    t()
+```
+
+Returns: list[Transform]
+
+## Dagster Integration
+
+### build_dagster_from_folder
+
+Scans a folder for Transform instances and builds Dagster asset definitions.
+
+```python
+from simple_dag.orchestrators.dagster import build_dagster_from_folder
+
+computed_assets, static_assets = build_dagster_from_folder(folder_path)
+```
+
+Returns: (list of Dagster software-defined assets, list of static source assets)
+
+### build_dagster
+
+Builds Dagster assets from an explicit list of Transform instances.
+
+```python
+from simple_dag.orchestrators.dagster import build_dagster
+
+computed_assets, static_assets = build_dagster(transforms)
+```
+
+### Launching the Dagster UI
+
+```bash
+dagster dev -f dag.py
+```
+
+A minimal dag.py:
+
+```python
+from simple_dag.orchestrators.dagster import build_dagster_from_folder
+import os
+
+computed_assets, static_assets = build_dagster_from_folder(
+    os.path.dirname(os.path.abspath(__file__))
+)
+```
+
+Note: `dagit` was the legacy command and is deprecated since Dagster 1.5. Use `dagster dev` instead.
+
+## Cloud Storage
+
+All path arguments use fsspec under the hood. Pass any fsspec-compatible URI — no code changes required:
+
+- Local: `/path/to/file.csv`
+- S3: `s3://my-bucket/path/to/file.csv`
+- Azure Blob: `abfs://my-container/path/to/file.csv`
+
+For authenticated access, set the appropriate environment variables or fsspec configuration before running the pipeline.
+
+## Complete Working Example
+
+```python
+import os
+from pydantic import BaseModel
+from simple_dag import transform, schedule, JsonInput, JsonOutput, PandasDFInput, PandasDFOutput
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+# --- JSON + Pydantic example ---
+
+class SensorReading(BaseModel):
+    sensor_id: str
+    value: float
+
+@transform(
+    reading=JsonInput(
+        os.path.join(BASE_DIR, "data/reading.json"),
+        schema_validation=SensorReading,
+    ),
+    output=JsonOutput(os.path.join(BASE_DIR, "data/alert.json")),
+)
+def evaluate_reading(reading: SensorReading, output: JsonOutput):
+    result = {"sensor_id": reading.sensor_id, "triggered": reading.value > 100}
+    output.write_data(result)
+
+
+# --- Pandas + schedule + health check example ---
+
+def has_rows(df):
+    return len(df) > 0
+
+@schedule("0 6 * * *")
+@transform(
+    df=PandasDFInput(
+        os.path.join(BASE_DIR, "data/salaries.csv"),
+        health_checks=[has_rows],
+    ),
+    output=PandasDFOutput(os.path.join(BASE_DIR, "data/salaries_2023.csv")),
+)
+def filter_2023(df, output: PandasDFOutput):
+    df = df[df["work_year"] == 2023]
+    output.write_data(df, index=False)
+
+
+@schedule(on_upstream_success=True)
+@transform(
+    df=PandasDFInput(os.path.join(BASE_DIR, "data/salaries_2023.csv")),
+    output=PandasDFOutput(os.path.join(BASE_DIR, "data/salaries_2023_us.csv")),
+)
+def filter_us(df, output: PandasDFOutput):
+    df = df[df["company_location"] == "US"]
+    output.write_data(df, index=False)
+
+
+# Run directly (no Dagster needed)
+if __name__ == "__main__":
+    evaluate_reading()
+    filter_2023()
+    filter_us()
+```

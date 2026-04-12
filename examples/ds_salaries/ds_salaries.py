@@ -57,7 +57,7 @@ def create_2023_salaries_ES(df, output: PandasDFOutput):
     ),
 )
 def create_2023_salaries_US(df, output: PandasDFOutput):
-    df = df[df["company_location"] == "ES"]
+    df = df[df["company_location"] == "US"]
     output.write_data(df, index=False)
 
 

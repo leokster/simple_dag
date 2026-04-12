@@ -1,71 +1,188 @@
-# 🎯 simple_dag
+# simple_dag
 
 ![pypi](https://img.shields.io/pypi/v/simple_dag.svg)
 [![Documentation Status](https://readthedocs.org/projects/simple-pipeline/badge/?version=latest)](https://simple-pipeline.readthedocs.io/en/latest/?version=latest)
 [![Updates](https://pyup.io/repos/github/leokster/simple_dag/shield.svg)](https://pyup.io/repos/github/leokster/simple_dag/)
 
-Welcome to `simple_dag`! Here, we provide the easiest way to create a pipeline in an orchestration-agnostic manner. Just decorate your functions with our `@transform` decorator! 🎉
+Orchestration-agnostic Python pipeline library. Decorate functions with `@transform` to define DAG nodes. Run them directly as plain Python callables or integrate with Dagster — no rewriting required.
 
 - Free software: MIT license
 
-## 🚀 Getting Started
+## Getting Started
 
-![DAG](https://raw.githubusercontent.com/leokster/simple_dag/main/assets/dagster.png)
-
-```
-git clone https://github.com/leokster/simple_dag.git
-cd simple_dag
-python3.10 -m venv venv
-source venv/bin/activate
+```bash
 pip install simple_dag
-venv/bin/dagit -f examples/dag.py
 ```
 
-## 💡 The Main Ideas
-
-### What is a DAG? 🤔: 
-A DAG, or Directed Acyclic Graph, represents a set of functions (the nodes) and their dependencies (the edges). It allows us to execute many functions, which depend on each other, in a specific order.
-
-### Aren't there already many DAG libraries?: 
-Absolutely, but most of them are tightly coupled to specific orchestration frameworks and require a very specific way to define a DAG. This makes it challenging to switch between frameworks. Our library, however, is different! 🎈
-
-### What is the goal of this library?: 
-Our library aims to offer a simple and streamlined way to define a DAG in a framework-agnostic manner. This means you can switch between frameworks without having to rewrite your DAG. As of now, we support Dagster and direct execution. 🎯
-
-### What is a transform?: 
-In the context of a data pipeline, a transform is a function that takes some data as input and produces some new data as output. It's like the magic wand in your data pipeline. 🪄
-
-### Show me some code! 👩‍💻: 
-Imagine we have a transformation where we read a CSV file, filter the data, and write it to a new CSV file. The `@transform` decorator marks a function as a transformation function. `PandasDFInput` and `PandasDFOutput` prepare the data for the transformation and write the post-transformation data, respectively. `df` is the input data and `output` is the output data.
-
-```
+```python
 import os
 from simple_dag import transform, PandasDFInput, PandasDFOutput
 
 @transform(
-        df=PandasDFInput(
-                os.path.join("data/curated/ds_salaries_2023.csv"),
-        ),
-        output=PandasDFOutput(
-                os.path.join("data/curated/ds_salaries_2023_ES.csv"),
-        ),
+    df=PandasDFInput("data/salaries.csv"),
+    output=PandasDFOutput("data/salaries_2023.csv"),
 )
-def create_2023_salaries_ES(df, output: PandasDFOutput):
-df = df[df["company_location"] == "ES"]
-output.write_data(df, index=False)
+def filter_2023(df, output: PandasDFOutput):
+    df = df[df["work_year"] == 2023]
+    output.write_data(df, index=False)
+
+# Run directly
+filter_2023()
 ```
 
-### `@transform`: 
-This decorator indicates that a function is a transformation. It accepts `Input` and `Output` arguments. Please note, the `Output` arguments are passed directly to your function, while the `Input` arguments are processed by the `Input` class and then the resultant data is passed to your function.
+## The Main Ideas
 
-### `Input`: 
-Inputs prepare the data for your function. Currently, we support the following inputs:
-- `PandasDFInput`: Reads a pandas dataframe from a CSV file. The function receives this data as a pandas dataframe.
-- `BinaryInput`: Reads a binary file. The function receives this data as a bytes object.
-- `SparkDFInput`: Reads a Spark dataframe from a parquet file (Experimental). The function receives this data as a Spark dataframe.
+**What is a transform?**
+A function decorated with `@transform`. Input arguments are loaded automatically; output arguments are passed through so your function can call `write_data()`.
 
-### `Output`: 
-Outputs write the data after your function has processed it. The `Output` objects have a `write_data` method, which can be used in your function to write the data. Currently, we support the following outputs:
-- `PandasDFOutput`: Writes a pandas dataframe to a CSV file.
-- `BinaryOutput`: Writes a binary file.
-- `SparkDFOutput`: Writes a Spark dataframe to a parquet file (Experimental).
+**Orchestration-agnostic?**
+Transforms are plain callables. Call them directly in Python or register them with Dagster using `build_dagster_from_folder`. Switch orchestrators without rewriting pipelines.
+
+## `@transform`
+
+```python
+from simple_dag import transform, PandasDFInput, PandasDFOutput
+
+@transform(
+    df=PandasDFInput("data/raw.csv"),
+    output=PandasDFOutput("data/processed.csv"),
+)
+def my_step(df, output: PandasDFOutput):
+    output.write_data(df[df["value"] > 0], index=False)
+```
+
+- Keyword arguments that are `Input` instances are loaded and the result is passed to your function.
+- Keyword arguments that are `Output` instances are passed through unchanged so you can call `write_data()`.
+
+## `@schedule`
+
+Stack `@schedule` above `@transform` to attach scheduling metadata:
+
+```python
+from simple_dag import transform, schedule, PandasDFInput, PandasDFOutput
+
+@schedule("0 * * * *")              # cron: run every hour
+@transform(...)
+def hourly_step(...): ...
+
+@schedule(on_upstream_success=True) # trigger when upstream finishes
+@transform(...)
+def downstream_step(...): ...
+```
+
+## Input Types
+
+| Class | Description |
+|---|---|
+| `PandasDFInput(path, **kwargs)` | Reads a CSV via fsspec; kwargs forwarded to `pd.read_csv`; supports `health_checks` |
+| `BinaryInput(path)` | Reads raw bytes; works with any fsspec-compatible path |
+| `SparkDFInput(path)` | Spark DataFrame from JSON/Parquet/CSV (experimental) |
+| `JsonInput(path, schema_validation=None)` | Reads a JSON file; validates with a Pydantic model if `schema_validation` is set; returns model or raw dict |
+| `PathInput(path)` | Pass-through — function receives the raw path string |
+| `DirectoryInput(path)` | Validates path is a directory; function receives the path string |
+| `Multiple(input_obj)` | Expands a wildcard path into a **list** of loaded inputs |
+| `MultipleIterator(input_obj)` | Like `Multiple` but returns a **lazy iterator** (memory-efficient) |
+
+## Output Types
+
+| Class | Description |
+|---|---|
+| `PandasDFOutput(path)` | Writes a DataFrame to CSV |
+| `BinaryOutput(path)` | Writes raw bytes |
+| `SparkDFOutput(path)` | Writes a Spark DataFrame to Parquet (experimental) |
+| `JsonOutput(path)` | Writes a dict, list, or Pydantic model to JSON |
+| `DirectoryOutput(path)` | Holds a path; `write_data` raises `NotImplementedError` — use `.path` directly |
+
+## Health Checks
+
+Pass a list of callables to any input or output. Each receives the loaded data and must return `True` to pass:
+
+```python
+def has_salary_col(df):
+    return "salary" in df.columns
+
+PandasDFInput("data.csv", health_checks=[has_salary_col])
+```
+
+A failed health check raises `ValueError`.
+
+## Direct Execution
+
+Transforms are plain callables — no Dagster required:
+
+```python
+filter_2023()   # loads inputs, runs function, writes outputs
+```
+
+You can also discover and run all transforms in a folder:
+
+```python
+from simple_dag.transforms import find_transform_instances_in_folder
+
+transforms = find_transform_instances_in_folder("my_pipeline/")
+for t in transforms:
+    t()
+```
+
+## Dagster Integration
+
+```python
+# dag.py
+from simple_dag.orchestrators.dagster import build_dagster_from_folder
+import os
+
+computed_assets, static_assets = build_dagster_from_folder(
+    os.path.dirname(os.path.abspath(__file__))
+)
+```
+
+Launch the Dagster UI:
+
+```bash
+dagster dev -f dag.py
+```
+
+## Cloud Storage
+
+All path arguments accept fsspec-compatible URIs — no code changes needed:
+
+- `s3://my-bucket/path/to/data.csv`
+- `abfs://my-container/path/to/data.csv` (Azure Blob)
+- `/local/path/to/data.csv`
+
+## Examples
+
+### JSON + Pydantic
+
+```python
+from pydantic import BaseModel
+from simple_dag import transform, JsonInput, JsonOutput
+
+class SensorReading(BaseModel):
+    sensor_id: str
+    value: float
+
+@transform(
+    reading=JsonInput("data/reading.json", schema_validation=SensorReading),
+    output=JsonOutput("data/alert.json"),
+)
+def evaluate(reading: SensorReading, output: JsonOutput):
+    result = {"sensor_id": reading.sensor_id, "triggered": reading.value > 100}
+    output.write_data(result)
+```
+
+### Multiple files with wildcard
+
+```python
+from simple_dag import transform, Multiple, PandasDFInput, PandasDFOutput
+
+@transform(
+    dfs=Multiple(PandasDFInput("data/raw/*.csv")),
+    output=PandasDFOutput("data/combined.csv"),
+)
+def combine(dfs, output: PandasDFOutput):
+    import pandas as pd
+    output.write_data(pd.concat(dfs), index=False)
+```
+
+See `examples/ds_salaries/` for a full multi-step pipeline including schedules, health checks, and a plot output.
