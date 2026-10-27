@@ -1,5 +1,3 @@
-import os
-
 import pandas as pd
 
 from simple_dag.datahandlers import base_handler

@@ -6,7 +6,8 @@ try:
     SPARK_INSTALLED = True
 except ImportError:
     ImportWarning(
-        "PySpark not installed. If you want to use Spark please install it with `pip install pyspark`"
+        "PySpark not installed. If you want to use Spark please install it "
+        "with `pip install pyspark`"
     )
     SPARK_INSTALLED = False
 

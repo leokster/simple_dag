@@ -13,7 +13,8 @@ try:
     SPARK_INSTALLED = True
 except ImportError:
     ImportWarning(
-        "PySpark not installed. If you want to use Spark please install it with `pip install pyspark`"
+        "PySpark not installed. If you want to use Spark please install it "
+        "with `pip install pyspark`"
     )
     SPARK_INSTALLED = False
 
@@ -73,7 +74,8 @@ class Transform:
             if isinstance(val, SparkDFInput):
                 if ctx is None:
                     raise ValueError(
-                        "Spark context is None. Please provide a Spark context to the compute method"
+                        "Spark context is None. "
+                        "Please provide a Spark context to the compute method"
                     )
                 parsed_kwargs[key] = val.get_data(ctx)
 

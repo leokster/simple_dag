@@ -56,7 +56,8 @@ class JsonInput(base_handler.ABCInput):
 
             elif not self.return_pydantic_model and pydantic_data is None:
                 raise ValueError(
-                    f"You need to specify a pydantic model to validate the data in {self.path}"
+                    "You need to specify a pydantic model to validate the data "
+                    f"in {self.path}"
                 )
 
             _execute_health_checks(self.path, data, self.health_checks)
@@ -89,7 +90,8 @@ class JsonOutput(base_handler.ABCOutput):
 
         else:
             raise ValueError(
-                f"Data type not supported: {type(data)}, only pydantic models and dicts/lists"
+                f"Data type not supported: {type(data)}, "
+                "only pydantic models and dicts/lists"
             )
 
         _execute_health_checks(self.path, data, self.health_checks)

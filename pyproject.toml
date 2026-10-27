@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=77", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,30 +7,33 @@ name = "simple_dag"
 dynamic = ["version"]
 description = "Create simple Pipelines with Python"
 readme = "README.md"
-license = {file = "LICENSE"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{name = "Tim Rohner", email = "info@timrohner.ch"}]
 keywords = ["simple_dag"]
+requires-python = ">=3.10"
 # homepage = "https://github.com/leokster/simple_dag"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Natural Language :: English",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12"
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14"
 ]
 dependencies = [
     "aiohttp >=3.9.0, <4",
-    "Click>=8.0, <=9",
-    "dagster-webserver >= 1.5.0, <= 2",
-    "dagster >= 1.5.0, <= 2",
-    "fsspec >=2023.1.0",
-    "matplotlib >=3.7.0, <=4",
-    "pandas >=2.1.0, <=3",
-    "requests >=2.28.0, <3",
+    "click >=8.1, <9",
+    "dagster-webserver >=1.12.0, <2",
+    "dagster >=1.12.0, <2",
+    "fsspec >=2024.2.0",
+    "matplotlib >=3.8.0, <4",
+    "pandas >=2.2.0, <4",
+    "pydantic >=2.0, <3",
+    "requests >=2.31.0, <3",
 ]
 
 [project.urls]
@@ -39,9 +42,12 @@ Source = "https://github.com/leokster/simple_dag"
 
 [project.optional-dependencies]
 dev = [
-    "black >= 24.0.0, <= 25",
-    "tox >= 3.14.0, <= 4.25.0",
-    "twine >= 6"
+    "black >=24.0.0, <27",
+    "build >=1.0",
+    "flake8 >=7.0",
+    "pytest >=8.0",
+    "tox >=4.0, <5",
+    "twine >=6, <8"
 ]
 
 

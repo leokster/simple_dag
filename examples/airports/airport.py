@@ -9,7 +9,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @transform(
     df=PandasDFInput(
-        "https://raw.githubusercontent.com/datasets/airport-codes/master/data/airport-codes.csv",
+        "https://raw.githubusercontent.com/datasets/airport-codes/master/data/"
+        "airport-codes.csv",
         sep=",",
         name="raw_airport_codes",
         description="Raw data for airport codes",
@@ -25,9 +26,7 @@ def download_data(df, output: PandasDFOutput):
 
 @schedule(on_upstream_success=True)
 @transform(
-    df=PandasDFInput(
-        os.path.join(BASE_DIR, "data/curated/airport_codes.csv"), sep=","
-    ),
+    df=PandasDFInput(os.path.join(BASE_DIR, "data/curated/airport_codes.csv"), sep=","),
     output=PandasDFOutput(
         os.path.join(BASE_DIR, "data/curated/airports_by_country.csv"),
         name="airports_by_country",
@@ -45,7 +44,8 @@ def create_airports_by_country(df, output: PandasDFOutput):
         os.path.join(BASE_DIR, "data/curated/airports_by_country.csv"), sep=","
     ),
     df2=PandasDFInput(
-        "https://raw.githubusercontent.com/datasets/country-codes/master/data/country-codes.csv",
+        "https://raw.githubusercontent.com/datasets/country-codes/master/data/"
+        "country-codes.csv",
         sep=",",
         name="raw_country_codes",
         description="Raw data for country codes",

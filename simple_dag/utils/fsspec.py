@@ -38,7 +38,8 @@ def list_files(pattern):
         fs = fsspec.filesystem("abfs", account_name=sa)
         files = fs.glob(pattern)
         files = [
-            f"{protocol}{container}@{sa}.dfs.core.windows.net/{'/'.join(file.split('/')[1:])}"
+            f"{protocol}{container}@{sa}.dfs.core.windows.net/"
+            f"{'/'.join(file.split('/')[1:])}"
             for file in files
         ]
         return files

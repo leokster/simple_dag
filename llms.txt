@@ -11,7 +11,7 @@
 pip install simple_dag
 ```
 
-Requires Python 3.9+.
+Requires Python 3.10+.
 
 ## Core Decorators
 

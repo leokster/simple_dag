@@ -28,5 +28,6 @@ class DirectoryOutput(base_handler.ABCOutput):
 
     def write_data(self, data):
         raise NotImplementedError(
-            "DirectoryOutput does not support write_data method, use directly the .path attribute"
+            "DirectoryOutput does not support write_data method, "
+            "use directly the .path attribute"
         )
