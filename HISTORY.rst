@@ -2,6 +2,13 @@
 History
 =======
 
+1.2.1 (2026-11-01)
+------------------
+
+* Type the handler base classes (``path: str``, ``name``/``description`` optional) so
+  downstream code such as ``Path(output.path)`` type-checks now that the package ships
+  ``py.typed``.
+
 1.2.0 (2026-11-01)
 ------------------
 

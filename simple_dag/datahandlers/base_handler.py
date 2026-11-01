@@ -1,16 +1,19 @@
-class ABCInput:
-    path = None
-    name = None
-    description = None
+from typing import Any
 
-    def get_data(self):
+
+class ABCInput:
+    path: str
+    name: str | None = None
+    description: str | None = None
+
+    def get_data(self) -> Any:
         pass
 
 
 class ABCOutput:
-    path = None
-    name = None
-    description = None
+    path: str
+    name: str | None = None
+    description: str | None = None
 
-    def write_data(self, data):
+    def write_data(self, data: Any) -> None:
         pass
