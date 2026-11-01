@@ -2,6 +2,23 @@
 History
 =======
 
+1.2.0 (2026-11-01)
+------------------
+
+* Base-relative paths: ``simple_dag.configure(base=...)`` or ``SIMPLE_DAG_BASE`` resolves
+  relative handler paths against one root (local folder, ``abfs://``, ``s3://``...).
+  Paths below the base authenticate against Azure by default (``anon=False``) and local
+  writes create missing parent directories. Absolute paths and URIs are unchanged.
+* ``simple_dag.utils.fsspec``: ``list_files`` returns base-relative results for relative
+  patterns; new ``exists``, ``isdir`` and ``remove`` helpers.
+* ``@schedule(..., timezone=...)`` and ``find_transform_instances_in_package`` (import-based
+  discovery that works inside zipped/pex deployments).
+* Dagster: ``build_definitions`` returns a ``Definitions`` object with one
+  ``ScheduleDefinition`` per cron (RUNNING by default), an automation-condition sensor for
+  ``on_upstream_success`` transforms, asset groups from the project folder, and asset names
+  sanitised to Dagster's ``[A-Za-z0-9_]``. Naming state is per build instead of module-global.
+* ``__version__`` now comes from the installed distribution; logging replaces ``print``.
+
 1.1.0 (2026-10-27)
 ------------------
 

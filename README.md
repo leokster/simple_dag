@@ -127,20 +127,25 @@ for t in transforms:
 ## Dagster Integration
 
 ```python
-# dag.py
-from simple_dag.orchestrators.dagster import build_dagster_from_folder
-import os
+# definitions.py
+from simple_dag.orchestrators.dagster import build_definitions
 
-computed_assets, static_assets = build_dagster_from_folder(
-    os.path.dirname(os.path.abspath(__file__))
-)
+defs = build_definitions("my_project.pipelines")  # package name, module, folder or list
 ```
+
+`build_definitions` turns every transform into an asset (grouped by the first folder of a
+base-relative path), every `@schedule(cron=...)` into a `ScheduleDefinition` that is running
+from the start, and `on_upstream_success` transforms into an automation-condition sensor.
+Pass `running=False` to create schedules in the stopped state.
 
 Launch the Dagster UI:
 
 ```bash
-dagster dev -f dag.py
+dagster dev -m my_project.definitions
 ```
+
+The older `build_dagster_from_folder(folder)` / `build_dagster(transforms)` helpers still
+return `(assets, source_assets)` for hand-built `Definitions`.
 
 ## Cloud Storage
 
@@ -149,6 +154,38 @@ All path arguments accept fsspec-compatible URIs — no code changes needed:
 - `s3://my-bucket/path/to/data.csv`
 - `abfs://my-container/path/to/data.csv` (Azure Blob)
 - `/local/path/to/data.csv`
+
+## Base Path
+
+Most pipelines read and write below one root. Configure it once and use relative paths in
+the handlers; the same code then runs against a local folder on a laptop and against a
+bucket or an Azure container in production:
+
+```bash
+export SIMPLE_DAG_BASE=~/data                                   # laptop
+export SIMPLE_DAG_BASE=abfs://data@account.dfs.core.windows.net  # production
+```
+
+```python
+from simple_dag import JsonInput, JsonOutput, transform
+
+@transform(
+    orders=JsonInput("sales/raw/orders.json"),
+    out=JsonOutput("sales/curated/orders.json"),
+)
+def clean_orders(orders, out):
+    out.write_data([o for o in orders if o["amount"] > 0])
+```
+
+- `simple_dag.configure(base=..., storage_options=...)` does the same from code;
+  `SIMPLE_DAG_STORAGE_OPTIONS` takes a JSON object of fsspec options for the base.
+- Below the base, Azure is accessed authenticated (`anon=False`, i.e. `DefaultAzureCredential`:
+  workload identity, managed identity or `az login`) and local writes create missing parent
+  directories. Absolute paths and URIs behave as before.
+- Relative paths also give stable, base-independent asset names in Dagster
+  (`sales/curated/orders.json` → `sales_curated_orders_json`, group `sales`).
+- `simple_dag.utils.fsspec.open / exists / remove / list_files` apply the same resolution for
+  code outside the handlers.
 
 ## Examples
 

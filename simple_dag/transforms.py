@@ -1,11 +1,16 @@
+import logging
 import os
+import pkgutil
 import sys
 from importlib import import_module
 from pathlib import Path
+from types import ModuleType
 from typing import Callable
 
 from simple_dag.datahandlers.spark_handler import SparkDFInput
 from simple_dag.datahandlers.base_handler import ABCInput, ABCOutput
+
+logger = logging.getLogger("simple_dag")
 
 try:
     from pyspark.sql import SparkSession
@@ -49,6 +54,7 @@ def get_spark():
 class Transform:
     compute_func: Callable = None
     on_upstream_success: bool = False
+    timezone: str | None = None
 
     def __init__(self, compute_func, *args, **kwargs) -> None:
         self.compute_func = compute_func
@@ -65,6 +71,18 @@ class Transform:
         if not hasattr(self, "_cron"):
             self._cron = []
         self._cron.append(cron)
+
+    @property
+    def inputs(self) -> dict:
+        return {
+            key: val for key, val in self.kwargs.items() if isinstance(val, ABCInput)
+        }
+
+    @property
+    def outputs(self) -> dict:
+        return {
+            key: val for key, val in self.kwargs.items() if isinstance(val, ABCOutput)
+        }
 
     def compute(self, ctx):
         parsed_args = self.args
@@ -90,6 +108,7 @@ class Transform:
         if "ctx" in self.compute_func.__code__.co_varnames:
             parsed_kwargs["ctx"] = ctx
 
+        logger.info("Running transform %s", self.__name__)
         return self.compute_func(*parsed_args, **parsed_kwargs)
 
     def __call__(self):
@@ -115,7 +134,15 @@ def transform(*args, **kwargs):
     return _inner
 
 
-def schedule(cron: str = None, on_upstream_success: bool = False):
+def schedule(cron: str = None, on_upstream_success: bool = False, timezone: str = None):
+    """Attach scheduling metadata to a transform.
+
+    ``cron`` runs the transform on a cron expression (repeat the decorator or
+    pass several crons for several schedules), ``on_upstream_success`` runs it
+    whenever one of its inputs was produced, ``timezone`` is the IANA zone the
+    cron is evaluated in (defaults to UTC in the orchestrator).
+    """
+
     def _inner(obj: Transform):
         if not isinstance(obj, Transform):
             raise ValueError("schedule decorator can only be used on Transform objects")
@@ -123,6 +150,8 @@ def schedule(cron: str = None, on_upstream_success: bool = False):
             obj.set_cron(cron)
         if on_upstream_success:
             obj.on_upstream_success = on_upstream_success
+        if timezone:
+            obj.timezone = timezone
         return obj
 
     return _inner
@@ -136,6 +165,37 @@ def find_transform_instances_in_module(module):
             transform_instances.append(obj)
 
     return transform_instances
+
+
+def find_transform_instances_in_package(package: str | ModuleType):
+    """Find all Transform instances in a package and its sub-packages.
+
+    Imports through the regular import system, so it works for installed and
+    zipped code alike (unlike the folder variant below). A transform re-exported
+    from several modules is returned once.
+
+    Args:
+        package: dotted name or module object of an importable package.
+    """
+    if isinstance(package, str):
+        package = import_module(package)
+
+    transforms = list(find_transform_instances_in_module(package))
+    if hasattr(package, "__path__"):
+        for module_info in pkgutil.walk_packages(
+            package.__path__, package.__name__ + ".", onerror=_raise_import_error
+        ):
+            module = import_module(module_info.name)
+            transforms += find_transform_instances_in_module(module)
+
+    unique = {}
+    for instance in transforms:
+        unique.setdefault(id(instance), instance)
+    return list(unique.values())
+
+
+def _raise_import_error(name):
+    raise ImportError(f"Could not import package {name} while searching for transforms")
 
 
 def find_transform_instances_in_folder(transforms_folder):

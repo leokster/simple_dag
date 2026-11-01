@@ -1,5 +1,6 @@
+from simple_dag import storage
 from simple_dag.datahandlers import base_handler
-import fsspec
+from simple_dag.utils import fsspec
 
 
 class DirectoryInput(base_handler.ABCInput):
@@ -13,11 +14,8 @@ class DirectoryInput(base_handler.ABCInput):
         self.kwargs = kwargs
 
     def get_data(self):
-        fs = fsspec.filesystem("file")
-
-        # check if path is a directory
-        if fs.isdir(self.path):
-            return self.path
+        if fsspec.isdir(self.path):
+            return storage.resolve(self.path)
 
 
 class DirectoryOutput(base_handler.ABCOutput):

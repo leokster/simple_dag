@@ -38,6 +38,8 @@ Returns a Transform object that is callable directly.
 ### @schedule
 
 Stack above @transform to attach scheduling metadata. Must be applied after @transform (outermost decorator).
+Signature: `schedule(cron=None, on_upstream_success=False, timezone=None)`; `timezone` is the IANA
+zone the cron is evaluated in (UTC when omitted). Apply it twice for two crons.
 
 ```python
 @schedule("0 * * * *")              # cron expression
@@ -311,7 +313,42 @@ for t in transforms:
 
 Returns: list[Transform]
 
+### find_transform_instances_in_package
+
+Import-based discovery; works for installed packages and zipped/pex deployments where the folder
+variant does not.
+
+```python
+from simple_dag.transforms import find_transform_instances_in_package
+
+transforms = find_transform_instances_in_package("my_project.pipelines")  # dotted name or module
+```
+
+Walks the package and all sub-packages, returns each Transform once (re-exports are de-duplicated).
+
 ## Dagster Integration
+
+### build_definitions
+
+Preferred entry point. Returns a `dagster.Definitions` object.
+
+```python
+from simple_dag.orchestrators.dagster import build_definitions
+
+defs = build_definitions("my_project.pipelines")   # or a module, a folder path, or a list of transforms
+```
+
+- Every transform becomes one asset (exactly one Output per transform). Inputs that no transform
+  produces become source assets.
+- Asset names: `name=` on the Output if given, else derived from the path with every character
+  outside `[A-Za-z0-9_]` replaced by `_` (`sales/curated/orders.json` → `sales_curated_orders_json`).
+  Base-relative paths give base-independent names; the first folder becomes the asset group.
+- `@schedule(cron=...)` → a `ScheduleDefinition` named `<asset>_schedule` running job `<asset>_job`
+  in the transform's `timezone`; several crons give `_schedule_2`, `_schedule_3`, ...
+- `@schedule(on_upstream_success=True)` → `AutomationCondition.eager()` plus one
+  `AutomationConditionSensorDefinition` named `default_automation_condition_sensor`.
+- Schedules and the sensor are RUNNING by default; `build_definitions(source, running=False)`
+  creates them STOPPED.
 
 ### build_dagster_from_folder
 
@@ -363,6 +400,32 @@ All path arguments use fsspec under the hood. Pass any fsspec-compatible URI —
 - Azure Blob: `abfs://my-container/path/to/file.csv`
 
 For authenticated access, set the appropriate environment variables or fsspec configuration before running the pipeline.
+
+## Base Path
+
+Configure one root and use relative paths in handlers; the same code runs against a local
+folder and against object storage.
+
+```bash
+export SIMPLE_DAG_BASE=~/data                                   # laptop
+export SIMPLE_DAG_BASE=abfs://data@account.dfs.core.windows.net  # production
+export SIMPLE_DAG_STORAGE_OPTIONS='{"anon": false}'              # optional fsspec options (JSON)
+```
+
+```python
+import simple_dag
+simple_dag.configure(base="/data", storage_options={})  # same thing from code
+```
+
+- `simple_dag.storage.resolve(path)` joins relative paths to the base; absolute paths and URIs
+  pass through unchanged. Without a base, relative paths resolve against the working directory
+  as before.
+- Below the base: Azure bases are accessed authenticated (`anon=False`, DefaultAzureCredential),
+  local writes create parent directories automatically.
+- `simple_dag.utils.fsspec.open(path, mode)`, `exists(path)`, `isdir(path)`, `remove(path)` and
+  `list_files(pattern)` apply the same resolution; `list_files` returns base-relative results
+  for relative patterns.
+- `PathInput` / `DirectoryInput` return the resolved path.
 
 ## Complete Working Example
 

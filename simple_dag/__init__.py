@@ -1,9 +1,16 @@
 """Top-level package for simple_dag."""
 
+from importlib import metadata as _metadata
+
 __author__ = """Tim Rohner"""
 __email__ = "info@timrohner.ch"
-__version__ = "0.1.0"
 
+try:
+    __version__ = _metadata.version("simple_dag")
+except _metadata.PackageNotFoundError:
+    __version__ = "0.0.0"
+
+from simple_dag.storage import configure
 from simple_dag.datahandlers.multiple import Multiple, MultipleIterator
 from simple_dag.datahandlers.spark_handler import SparkDFInput, SparkDFOutput
 from simple_dag.datahandlers.pandas_handler import (
@@ -19,7 +26,7 @@ from simple_dag.transforms import transform, schedule, Transform
 __all__ = [
     "BinaryInput",
     "BinaryOutput",
-    "BinaryOutput",
+    "configure",
     "DirectoryInput",
     "DirectoryOutput",
     "JsonInput",
