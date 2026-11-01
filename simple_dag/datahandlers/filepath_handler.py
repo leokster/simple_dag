@@ -1,3 +1,4 @@
+from simple_dag import storage
 from simple_dag.datahandlers import base_handler
 
 
@@ -12,4 +13,4 @@ class PathInput(base_handler.ABCInput):
         self.kwargs = kwargs
 
     def get_data(self):
-        return self.path
+        return storage.resolve(self.path)
