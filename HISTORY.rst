@@ -2,6 +2,13 @@
 History
 =======
 
+1.2.2 (2026-11-02)
+------------------
+
+* Dagster: every asset carries definition metadata ``simple_dag/path`` (the handler path
+  as written) and, when that path resolves to a URI, the standard ``dagster/uri``, so a
+  platform can link assets to the files behind them.
+
 1.2.1 (2026-11-01)
 ------------------
 
