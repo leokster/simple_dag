@@ -47,6 +47,17 @@ def _dataset_name_from_path(path):
     return _INVALID_NAME_CHARS.sub("_", stem)
 
 
+def _metadata(path):
+    """Definition metadata of the asset behind ``path``: the handler path as
+    written under ``simple_dag/path`` and, when it resolves to a URI, the
+    standard ``dagster/uri``."""
+    metadata = {"simple_dag/path": path}
+    resolved = storage.resolve(path)
+    if "://" in resolved:
+        metadata["dagster/uri"] = resolved
+    return metadata
+
+
 class _AssetNaming:
     """Asset names, descriptions and groups for one build.
 
@@ -115,6 +126,7 @@ def _generate_static_assets(inputs, outputs, naming: _AssetNaming):
                 key=naming.name(path),
                 description=naming.description(path),
                 group_name=naming.group(path),
+                metadata=_metadata(path),
             )
         )
 
@@ -149,6 +161,7 @@ def _generate_dagster_asset(
         deps=[naming.name(val.path) for val in inputs.values()],
         description=naming.description(output.path),
         group_name=naming.group(output.path),
+        metadata=_metadata(output.path),
         freshness_policy=freshness_policy,
         automation_condition=automation_condition,
     )

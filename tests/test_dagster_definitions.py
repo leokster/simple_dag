@@ -161,3 +161,52 @@ def test_legacy_build_dagster_still_returns_assets_and_sources():
     assert [spec.key.to_user_string() for spec in static_assets] == [
         "proj_raw_numbers_json"
     ]
+
+
+def _metadata_by_key(repo):
+    """Plain metadata values per asset key, whether or not Dagster wrapped them."""
+    return {
+        key.to_user_string(): {
+            name: getattr(value, "value", value)
+            for name, value in assets_def.specs_by_key[key].metadata.items()
+        }
+        for key, assets_def in repo.assets_defs_by_key.items()
+    }
+
+
+def test_build_definitions_metadata_records_the_handler_path():
+    metadata = _metadata_by_key(build_definitions(_chain()).get_repository_def())
+    assert metadata["proj_total"]["simple_dag/path"] == "proj/curated/total.json"
+    assert "dagster/uri" not in metadata["proj_total"]
+
+
+def test_build_definitions_metadata_resolves_uri_below_remote_base():
+    storage.configure(base="abfs://c@acct.dfs.core.windows.net")
+
+    @transform(
+        numbers=JsonInput("proj/raw/numbers.json"),
+        out=JsonOutput("proj/curated/total.json"),
+    )
+    def total(numbers, out):
+        out.write_data({})
+
+    metadata = _metadata_by_key(build_definitions([total]).get_repository_def())
+    assert metadata["proj_curated_total_json"]["dagster/uri"] == (
+        "abfs://c@acct.dfs.core.windows.net/proj/curated/total.json"
+    )
+    assert metadata["proj_raw_numbers_json"] == {
+        "simple_dag/path": "proj/raw/numbers.json",
+        "dagster/uri": "abfs://c@acct.dfs.core.windows.net/proj/raw/numbers.json",
+    }
+
+
+def test_build_definitions_metadata_keeps_absolute_uri():
+    uri = "abfs://c@acct.dfs.core.windows.net/p/a.json"
+
+    @transform(out=JsonOutput(uri))
+    def remote(out):
+        out.write_data({})
+
+    repo = build_definitions([remote]).get_repository_def()
+    (entry,) = _metadata_by_key(repo).values()
+    assert entry == {"simple_dag/path": uri, "dagster/uri": uri}
