@@ -223,3 +223,40 @@ def combine(dfs, output: PandasDFOutput):
 ```
 
 See `examples/ds_salaries/` for a full multi-step pipeline including schedules, health checks, and a plot output.
+
+## Optional platform execution contracts
+
+`simple_dag.platform` adds opt-in integration building blocks without changing existing path-based transforms or standalone schedule defaults:
+
+- `ArrowInput` / `ArrowOutput` read and write Parquet with Arrow tables and boolean or structured checks (`pip install simple_dag[arrow]`).
+- `ExecutionContext` carries run, attempt, project, branch, environment, parameters, and configuration.
+- `definition_manifest(transforms)` returns a deterministic protocol-v1 manifest with stable asset bindings, schema declarations, and required check IDs.
+- `execute(transform, context, inputs, outputs)` executes copied bindings so concurrent platform attempts do not mutate the original definition. Multiple outputs are supported; the integrating platform owns atomic publication.
+- `evaluate_check` converts boolean checks and exceptions to explicit passed/failed/error results. Checks do not grant publication authority.
+
+Import these features explicitly from `simple_dag.platform`. Bedrock resolves logical asset IDs, isolates discovery/execution, stages outputs, and authorizes publication. Existing `build_definitions(..., running=True)` behavior remains unchanged; platform-managed schedules are activated by the platform rather than imported project code.
+
+### Platform asset paths (1.3)
+
+Platform bindings can use stable catalog paths instead of UUIDs:
+
+```python
+from simple_dag import transform
+from simple_dag.platform import ArrowInput, ArrowOutput
+
+@transform(
+    orders=ArrowInput('/finance/raw/orders'),
+    revenue=ArrowOutput('/analytics/reports/revenue', schema_fields=[
+        {'name': 'total', 'type': 'double', 'nullable': True},
+    ]),
+)
+def summarize(orders, revenue):
+    import pyarrow as pa
+    revenue.write_data(pa.table({'total': [float(orders.num_rows)]}))
+```
+
+The platform resolves `/project-slug/path` references and supplies allocated local
+files during execution. Standalone local paths and existing `asset_id` bindings
+remain supported. Use `asset_path=` to declare a catalog reference separately
+from a local file path. Definition manifests include source module paths and line
+numbers for editor navigation. Install `simple_dag[arrow]` for Arrow support.

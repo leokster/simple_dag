@@ -41,6 +41,7 @@ Source = "https://github.com/leokster/simple_dag"
 
 
 [project.optional-dependencies]
+arrow = ["pyarrow>=19,<24", "duckdb>=1.2,<2"]
 dev = [
     "black >=24.0.0, <27",
     "build >=1.0",
