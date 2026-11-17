@@ -266,3 +266,7 @@ numbers for editor navigation. Install `simple_dag[arrow]` for Arrow support.
 Every standard input/output inherits the same `bind_path()` contract. Runners copy the declared handler and replace only its physical path; pandas options, JSON models, and health checks are retained. Use `with_asset("/project/path", schema_fields=[...])` to associate a logical asset with a local handler. Absolute paths can also identify assets in a remote runner. Local execution continues to use the original path. `Multiple` and `MultipleIterator` retain the wrapped handler's options.
 
 Arrow handlers live in `simple_dag.datahandlers.arrow_handler` (also exported from `simple_dag.datahandlers`). Definitions, execution, and structured checks live in `simple_dag.definitions`, `simple_dag.execution`, and `simple_dag.checks`. The old `simple_dag.platform` module contains compatibility imports only. Spark handlers still require the optional PySpark installation and a Java runtime; remote runners supply an execution context with a Spark session.
+
+### Execution context
+
+Transforms may accept a `ctx` argument when executed by a host using `ExecutionContext`. It provides run/project/branch/environment identifiers, `ctx.parameters`, `ctx.configuration`, `ctx.env` (the explicitly configured environment variables), and `ctx.secrets` (values supplied by the host). Secrets are excluded from the context representation. Standalone callers can supply their own context with `execute`; simpleDag does not load credentials from a platform service.

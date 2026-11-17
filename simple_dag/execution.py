@@ -15,9 +15,17 @@ class ExecutionContext:
     configuration: dict = field(default_factory=dict)
     partition: dict = field(default_factory=dict)
     spark: object = field(default=None, repr=False, compare=False)
+    secrets: dict = field(default_factory=dict, repr=False, compare=False)
+
+    @property
+    def env(self):
+        """Environment variables explicitly supplied by the execution host."""
+        return dict(self.configuration.get("env", {}))
 
 
-def execute(transform, context: ExecutionContext, inputs: dict, outputs: dict, emit=None):
+def execute(
+    transform, context: ExecutionContext, inputs: dict, outputs: dict, emit=None
+):
     if set(inputs) != set(transform.inputs) or set(outputs) != set(transform.outputs):
         raise ValueError("Bindings must match the complete transform definition")
     isolated = copy.copy(transform)

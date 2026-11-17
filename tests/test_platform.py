@@ -43,12 +43,15 @@ def test_manifest_multiple_outputs_and_isolated_context(tmp_path):
         },
     )
     assert split.outputs["left"].path == "unused-left"
-    assert ArrowInput(str(tmp_path / "right.parquet")).get_data().to_pylist() == [{"value": 2}]
+    assert ArrowInput(str(tmp_path / "right.parquet")).get_data().to_pylist() == [
+        {"value": 2}
+    ]
 
 
 def test_asset_paths_and_source_locations():
     @transform(
-        source=ArrowInput("/finance/raw/orders"), result=ArrowOutput("/analytics/reports/revenue")
+        source=ArrowInput("/finance/raw/orders"),
+        result=ArrowOutput("/analytics/reports/revenue"),
     )
     def report(source, result):
         pass
@@ -58,3 +61,35 @@ def test_asset_paths_and_source_locations():
     assert definition["outputs"]["result"]["asset_id"] is None
     assert definition["source"]["path"].endswith("test_platform.py")
     assert definition["source"]["line"] > 0
+
+
+def test_execution_context_exposes_host_environment_and_private_secrets():
+    from simple_dag import transform
+    from simple_dag.execution import ExecutionContext, execute
+
+    received = {}
+
+    @transform()
+    def contextual(ctx):
+        received.update(
+            env=ctx.env, secret=ctx.secrets["api_key"], project=ctx.project_id
+        )
+
+    context = ExecutionContext(
+        "run",
+        "attempt",
+        "project",
+        "main",
+        "development",
+        configuration={"env": {"REGION": "CH"}},
+        secrets={"api_key": "private-test-value"},
+    )
+    execute(contextual, context, {}, {})
+    assert received == {
+        "env": {"REGION": "CH"},
+        "secret": "private-test-value",
+        "project": "project",
+    }
+    assert "private-test-value" not in repr(context)
+    context.env["REGION"] = "changed"
+    assert context.env["REGION"] == "CH"
