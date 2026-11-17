@@ -3,8 +3,13 @@ from simple_dag.utils import fsspec
 
 
 class Multiple(base_handler.ABCInput):
+    storage_layout = "pattern"
+
     def __init__(self, input_obj: base_handler.ABCInput) -> None:
         self.path = input_obj.path
+        self.asset_path = input_obj.asset_path
+        self.asset_kind = input_obj.asset_kind
+        self.data_format = input_obj.data_format
         self.name = input_obj.name
         self.description = input_obj.description
         if hasattr(input_obj, "args"):
@@ -12,13 +17,14 @@ class Multiple(base_handler.ABCInput):
         else:
             self.args = ()
         if hasattr(input_obj, "kwargs"):
-            self.kwargs = input_obj.kwargs
+            self.kwargs = dict(input_obj.kwargs)
         else:
             self.kwargs = {}
         if hasattr(input_obj, "health_checks"):
             self.kwargs["health_checks"] = input_obj.health_checks
 
         self.input_cls = input_obj.__class__
+        self.template = input_obj.bind_path(input_obj.path)
 
     def get_data(self):
         # self.path contains wildcards e.g. /path/to/data/*.csv
@@ -26,7 +32,7 @@ class Multiple(base_handler.ABCInput):
         files = fsspec.list_files(self.path)
         input_objs = []
         for file in files:
-            input_obj = self.input_cls(file, *self.args, **self.kwargs)
+            input_obj = self.template.bind_path(file)
             input_objs.append(input_obj)
 
         return [input_obj.get_data() for input_obj in input_objs]
@@ -46,9 +52,8 @@ class LengthAwareIterator:
 
 
 class MultipleIterator(Multiple):
-
     def get_data(self):
         files = fsspec.list_files(self.path)
-        inputs = [self.input_cls(file, *self.args, **self.kwargs) for file in files]
+        inputs = [self.template.bind_path(file) for file in files]
 
         return LengthAwareIterator(inputs)

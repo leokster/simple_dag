@@ -242,7 +242,7 @@ Platform bindings can use stable catalog paths instead of UUIDs:
 
 ```python
 from simple_dag import transform
-from simple_dag.platform import ArrowInput, ArrowOutput
+from simple_dag.datahandlers import ArrowInput, ArrowOutput
 
 @transform(
     orders=ArrowInput('/finance/raw/orders'),
@@ -260,3 +260,9 @@ files during execution. Standalone local paths and existing `asset_id` bindings
 remain supported. Use `asset_path=` to declare a catalog reference separately
 from a local file path. Definition manifests include source module paths and line
 numbers for editor navigation. Install `simple_dag[arrow]` for Arrow support.
+
+### Handler bindings
+
+Every standard input/output inherits the same `bind_path()` contract. Runners copy the declared handler and replace only its physical path; pandas options, JSON models, and health checks are retained. Use `with_asset("/project/path", schema_fields=[...])` to associate a logical asset with a local handler. Absolute paths can also identify assets in a remote runner. Local execution continues to use the original path. `Multiple` and `MultipleIterator` retain the wrapped handler's options.
+
+Arrow handlers live in `simple_dag.datahandlers.arrow_handler` (also exported from `simple_dag.datahandlers`). Definitions, execution, and structured checks live in `simple_dag.definitions`, `simple_dag.execution`, and `simple_dag.checks`. The old `simple_dag.platform` module contains compatibility imports only. Spark handlers still require the optional PySpark installation and a Java runtime; remote runners supply an execution context with a Spark session.

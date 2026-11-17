@@ -9,12 +9,15 @@ class BinaryInput(base_handler.ABCInput):
         self.path = path
         self.name = name
         self.description = description
+        self.health_checks = health_checks
         self.args = args
         self.kwargs = kwargs
 
     def get_data(self):
         with fsspec.open(self.path, mode="rb") as f:
-            return f.read()
+            data = f.read()
+        self.check(data, "input")
+        return data
 
 
 class BinaryOutput(base_handler.ABCOutput):
@@ -22,7 +25,9 @@ class BinaryOutput(base_handler.ABCOutput):
         self.path = path
         self.name = name
         self.description = description
+        self.health_checks = health_checks
 
     def write_data(self, data):
+        self.check(data, "output")
         with fsspec.open(self.path, mode="wb") as f:
             f.write(data)

@@ -7,13 +7,11 @@ from pydantic import BaseModel
 from simple_dag.datahandlers import base_handler
 
 
-def _execute_health_checks(path, df, health_checks):
-    for health_check in health_checks:
-        if not health_check(df):
-            raise ValueError(f"Health check failed for {path}: {health_check.__name__}")
-
-
 class JsonInput(base_handler.ABCInput):
+    asset_kind = "document"
+    data_format = "json"
+    default_extension = ".json"
+
     def __init__(
         self,
         path,
@@ -51,22 +49,25 @@ class JsonInput(base_handler.ABCInput):
                 pydantic_data = self.schema_validation.model_validate(data)
 
             if pydantic_data is not None and self.return_pydantic_model:
-                _execute_health_checks(self.path, pydantic_data, self.health_checks)
+                self.check(pydantic_data, "input")
                 return pydantic_data
 
             elif not self.return_pydantic_model and pydantic_data is None:
                 raise ValueError(
-                    "You need to specify a pydantic model to validate the data "
-                    f"in {self.path}"
+                    f"You need to specify a pydantic model to validate the data in {self.path}"
                 )
 
-            _execute_health_checks(self.path, data, self.health_checks)
+            self.check(data, "input")
             return data
 
         raise ValueError(f"File extension not supported: {self.path}, only .json")
 
 
 class JsonOutput(base_handler.ABCOutput):
+    asset_kind = "document"
+    data_format = "json"
+    default_extension = ".json"
+
     def __init__(
         self,
         path,
@@ -90,11 +91,10 @@ class JsonOutput(base_handler.ABCOutput):
 
         else:
             raise ValueError(
-                f"Data type not supported: {type(data)}, "
-                "only pydantic models and dicts/lists"
+                f"Data type not supported: {type(data)}, only pydantic models and dicts/lists"
             )
 
-        _execute_health_checks(self.path, data, self.health_checks)
+        self.check(data, "output")
 
         with fsspec.open(self.path, "w") as f:
             json.dump(json_data, f, indent=2, *args, **kwargs)

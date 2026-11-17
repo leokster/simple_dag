@@ -4,13 +4,11 @@ from simple_dag.datahandlers import base_handler
 from simple_dag.utils import fsspec
 
 
-def _execute_health_checks(path, df, health_checks):
-    for health_check in health_checks:
-        if not health_check(df):
-            raise ValueError(f"Health check failed for {path}: {health_check.__name__}")
-
-
 class PandasDFInput(base_handler.ABCInput):
+    asset_kind = "table"
+    data_format = "csv"
+    default_extension = ".csv"
+
     def __init__(
         self, path, *args, name=None, description=None, health_checks=[], **kwargs
     ) -> None:
@@ -36,7 +34,7 @@ class PandasDFInput(base_handler.ABCInput):
             with fsspec.open(self.path, "r") as f:
                 df = pd.read_csv(f, **pd_read_csv_kwargs)
 
-            _execute_health_checks(self.path, df, self.health_checks)
+            self.check(df, "input")
 
             return df
 
@@ -44,6 +42,10 @@ class PandasDFInput(base_handler.ABCInput):
 
 
 class PandasDFOutput(base_handler.ABCOutput):
+    asset_kind = "table"
+    data_format = "csv"
+    default_extension = ".csv"
+
     def __init__(self, path, name=None, description=None, health_checks=[]) -> None:
         self.path = path
         self.name = name
@@ -51,7 +53,7 @@ class PandasDFOutput(base_handler.ABCOutput):
         self.health_checks = health_checks
 
     def write_data(self, df, *args, **kwargs):
-        _execute_health_checks(self.path, df, self.health_checks)
+        self.check(df, "output")
 
         with fsspec.open(self.path, "w") as f:
             df.to_csv(f, *args, **kwargs)

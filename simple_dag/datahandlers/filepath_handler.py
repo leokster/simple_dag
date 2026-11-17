@@ -9,8 +9,11 @@ class PathInput(base_handler.ABCInput):
         self.path = path
         self.name = name
         self.description = description
+        self.health_checks = health_checks
         self.args = args
         self.kwargs = kwargs
 
     def get_data(self):
-        return storage.resolve(self.path)
+        path = storage.resolve(self.path)
+        self.check(path, "input")
+        return path
