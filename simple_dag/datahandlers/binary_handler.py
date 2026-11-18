@@ -3,13 +3,12 @@ from simple_dag.utils import fsspec
 
 
 class BinaryInput(base_handler.ABCInput):
+    """Reads a file as bytes."""
+
     def __init__(
-        self, path, *args, name=None, description=None, health_checks=[], **kwargs
+        self, path, *args, name=None, description=None, health_checks=None, **kwargs
     ) -> None:
-        self.path = path
-        self.name = name
-        self.description = description
-        self.health_checks = health_checks
+        super().__init__(path, name, description, health_checks)
         self.args = args
         self.kwargs = kwargs
 
@@ -21,11 +20,7 @@ class BinaryInput(base_handler.ABCInput):
 
 
 class BinaryOutput(base_handler.ABCOutput):
-    def __init__(self, path, name=None, description=None, health_checks=[]) -> None:
-        self.path = path
-        self.name = name
-        self.description = description
-        self.health_checks = health_checks
+    """Writes bytes to a file."""
 
     def write_data(self, data):
         self.check(data, "output")

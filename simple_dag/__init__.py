@@ -11,19 +11,28 @@ except _metadata.PackageNotFoundError:
     __version__ = "0.0.0"
 
 from simple_dag.storage import configure
-from simple_dag.datahandlers.multiple import Multiple, MultipleIterator
-from simple_dag.datahandlers.spark_handler import SparkDFInput, SparkDFOutput
-from simple_dag.datahandlers.pandas_handler import (
+from simple_dag.datahandlers import (
+    ArrowInput,
+    ArrowOutput,
+    BinaryInput,
+    BinaryOutput,
+    DirectoryInput,
+    DirectoryOutput,
+    JsonInput,
+    JsonOutput,
+    Multiple,
+    MultipleIterator,
     PandasDFInput,
     PandasDFOutput,
+    PathInput,
+    SparkDFInput,
+    SparkDFOutput,
 )
-from simple_dag.datahandlers.binary_handler import BinaryInput, BinaryOutput
-from simple_dag.datahandlers.filepath_handler import PathInput
-from simple_dag.datahandlers.directory_handler import DirectoryInput, DirectoryOutput
-from simple_dag.datahandlers.json_handler import JsonInput, JsonOutput
 from simple_dag.transforms import transform, schedule, Transform
 
 __all__ = [
+    "ArrowInput",
+    "ArrowOutput",
     "BinaryInput",
     "BinaryOutput",
     "configure",

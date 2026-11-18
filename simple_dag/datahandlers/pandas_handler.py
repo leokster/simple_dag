@@ -5,24 +5,22 @@ from simple_dag.utils import fsspec
 
 
 class PandasDFInput(base_handler.ABCInput):
+    """Reads a CSV file into a pandas DataFrame.
+
+    Extra keyword arguments that ``pandas.read_csv`` knows, such as ``sep``, are
+    passed on to it.
+    """
+
     asset_kind = "table"
     data_format = "csv"
     default_extension = ".csv"
 
     def __init__(
-        self, path, *args, name=None, description=None, health_checks=[], **kwargs
+        self, path, *args, name=None, description=None, health_checks=None, **kwargs
     ) -> None:
-        """
-        Pandas Dataframe Input Handler.
-
-        Used to read data from pandas dataframes in simple_dag transforms.
-        """
-        self.path = path
-        self.name = name
-        self.description = description
+        super().__init__(path, name, description, health_checks)
         self.args = args
         self.kwargs = kwargs
-        self.health_checks = health_checks
 
     def get_data(self):
         if self.path.endswith(".csv"):
@@ -42,15 +40,11 @@ class PandasDFInput(base_handler.ABCInput):
 
 
 class PandasDFOutput(base_handler.ABCOutput):
+    """Writes a pandas DataFrame to a CSV file."""
+
     asset_kind = "table"
     data_format = "csv"
     default_extension = ".csv"
-
-    def __init__(self, path, name=None, description=None, health_checks=[]) -> None:
-        self.path = path
-        self.name = name
-        self.description = description
-        self.health_checks = health_checks
 
     def write_data(self, df, *args, **kwargs):
         self.check(df, "output")

@@ -9,6 +9,7 @@
 
 ```
 pip install simple_dag
+pip install simple_dag[arrow]   # adds pyarrow and duckdb for ArrowInput / ArrowOutput
 ```
 
 Requires Python 3.10+.
@@ -54,6 +55,7 @@ def downstream_step(...): ...
 Parameters:
 - cron (str): A cron expression string (e.g. "0 * * * *" for hourly).
 - on_upstream_success (bool): If True, trigger when any upstream transform completes successfully.
+- timezone (str): IANA zone the cron is evaluated in, e.g. "Europe/Zurich".
 
 Both can be combined on the same transform by stacking multiple @schedule decorators.
 
@@ -64,11 +66,44 @@ The object returned by @transform. It is callable.
 - Transform.__call__(): Loads all inputs, runs the wrapped function, returns the result.
 - Transform.cron (list[str]): Cron expressions attached via @schedule.
 - Transform.on_upstream_success (bool): Whether the transform is triggered on upstream success.
+- Transform.timezone (str | None): Timezone attached via @schedule.
+- Transform.inputs / Transform.outputs (dict): The declared Input / Output handlers by argument name.
 - Transform.__name__ (str): The name of the wrapped function.
 
-## Input Handlers
+If the function declares a `ctx` argument it receives the execution context of the run, see
+Running Transforms From a Host.
 
-All inputs accept path as the first argument. Paths support local filesystems and any fsspec-compatible URI (s3://, abfs://, etc.).
+## Handlers
+
+All handlers are importable from `simple_dag` and from `simple_dag.datahandlers`:
+
+```python
+from simple_dag import PandasDFInput, PandasDFOutput, ArrowInput, ArrowOutput
+from simple_dag import JsonInput, JsonOutput, BinaryInput, BinaryOutput
+from simple_dag import PathInput, DirectoryInput, DirectoryOutput
+from simple_dag import Multiple, MultipleIterator, SparkDFInput, SparkDFOutput
+from simple_dag.datahandlers import ABCInput, ABCOutput  # base classes for custom handlers
+```
+
+Every handler takes path as the first argument and the same optional arguments. Pass them as
+keywords: inputs keep extra positional arguments for their reader.
+
+- name (str): asset name in Dagster, instead of the name derived from the path.
+- description (str): asset description in Dagster.
+- health_checks (list[Callable]): see Health Checks.
+
+Paths support local filesystems and any fsspec-compatible URI (s3://, abfs://, etc.); relative paths
+resolve against the base path (see Base Path). Exception: ArrowInput / ArrowOutput and the Spark
+handlers hand the path to pyarrow / Spark unchanged.
+
+Every handler also has (see Running Transforms From a Host):
+
+- bind_path(path): a copy of the handler at another path; options and health checks are kept.
+- with_asset(path, *, schema_fields=None): a copy tied to the logical asset at path.
+- check_results: outcome of the health checks of the last read or write (always empty on a
+  Multiple, which checks every file with a copy of the wrapped input).
+
+## Input Handlers
 
 ### PandasDFInput
 
@@ -76,16 +111,36 @@ Reads a CSV file into a pandas DataFrame.
 
 ```python
 PandasDFInput(
-    path,                  # str: file path or fsspec URI
+    path,                  # str: file path or fsspec URI, must end with .csv
     *args,
-    name=None,             # str: asset name for Dagster
-    description=None,      # str: asset description for Dagster
-    health_checks=[],      # list[Callable]: each receives the DataFrame, must return True
+    name=None,
+    description=None,
+    health_checks=None,    # each check receives the DataFrame
     **kwargs               # forwarded to pd.read_csv (e.g. sep=",", dtype={"col": str})
 )
 ```
 
 get_data() returns: pandas.DataFrame
+
+### ArrowInput
+
+Reads a Parquet file, or a directory of Parquet files, into an Arrow table.
+Requires `pip install simple_dag[arrow]`.
+
+```python
+ArrowInput(
+    path,
+    name=None,
+    description=None,
+    health_checks=None,    # each check receives the pyarrow.Table
+    *,
+    asset_path=None,       # logical asset, see Running Transforms From a Host
+    schema_fields=None,
+    asset_id=None,
+)
+```
+
+get_data() returns: pyarrow.Table
 
 ### BinaryInput
 
@@ -94,8 +149,10 @@ Reads a file as raw bytes.
 ```python
 BinaryInput(
     path,
+    *,
     name=None,
     description=None,
+    health_checks=None,
 )
 ```
 
@@ -107,14 +164,15 @@ Reads a Spark DataFrame. Requires PySpark installed separately.
 
 ```python
 SparkDFInput(
-    path,
-    format="parquet",      # "parquet", "json", or "csv"
+    path,                  # .json and .csv by extension, anything else is read as Parquet
     name=None,
     description=None,
+    health_checks=None,
 )
 ```
 
-get_data(ctx) returns: pyspark.sql.DataFrame — requires a SparkSession passed as ctx.
+get_data(spark) returns: pyspark.sql.DataFrame — requires a SparkSession. A transform that is
+called directly gets one created when PySpark is installed.
 
 ### JsonInput
 
@@ -126,50 +184,57 @@ JsonInput(
     *args,
     name=None,
     description=None,
-    health_checks=[],
+    health_checks=None,
     schema_validation=None,        # Pydantic BaseModel class for validation
-    return_pydantic_model=True,    # if True and schema_validation set, returns model instance
+    return_pydantic_model=True,    # False: validate, but return the parsed JSON
     **kwargs
 )
 ```
 
 get_data() returns:
 - Pydantic model instance if schema_validation is set and return_pydantic_model=True
-- dict/list if no schema_validation
+- dict/list otherwise
 
-Raises ValueError if schema validation fails or if return_pydantic_model=True but no schema_validation provided.
+Raises pydantic.ValidationError if schema validation fails and ValueError if
+return_pydantic_model=False but no schema_validation is provided.
 
 ### PathInput
 
-Passes the raw path string to the function without loading anything.
+Passes the path string to the function without loading anything.
 
 ```python
 PathInput(
     path,
+    *,
     name=None,
     description=None,
+    health_checks=None,    # each check receives the path
 )
 ```
 
-get_data() returns: str (the path)
+get_data() returns: str (the path, resolved against the base path)
 
 ### DirectoryInput
 
-Validates that the path is an existing directory, then passes the path string.
+Passes the path of a directory to the function.
 
 ```python
 DirectoryInput(
     path,
+    *,
     name=None,
     description=None,
+    health_checks=None,    # each check receives the path
 )
 ```
 
-get_data() returns: str (the directory path). Raises ValueError if path is not a directory.
+get_data() returns: str (the resolved directory path), or None if the path is not an existing
+directory.
 
 ### Multiple
 
-Expands a wildcard path into a list of loaded inputs. Wraps any other Input class.
+Expands a wildcard path into a list of loaded inputs. Wraps any other Input class; the options and
+health checks of the wrapped input apply to every file.
 
 ```python
 Multiple(
@@ -196,7 +261,7 @@ get_data() returns: LengthAwareIterator — supports len() and iteration; each s
 
 ## Output Handlers
 
-All outputs accept path as the first argument and support fsspec URIs.
+The transform function receives the output handler itself and calls write_data().
 
 ### PandasDFOutput
 
@@ -207,11 +272,30 @@ PandasDFOutput(
     path,
     name=None,
     description=None,
-    health_checks=[],   # each receives the DataFrame before writing, must return True
+    health_checks=None,    # each check receives the DataFrame before writing
 )
 ```
 
 write_data(df, **kwargs): kwargs forwarded to df.to_csv().
+
+### ArrowOutput
+
+Writes an Arrow table to a Parquet file. Requires `pip install simple_dag[arrow]`.
+
+```python
+ArrowOutput(
+    path,
+    name=None,
+    description=None,
+    health_checks=None,    # each check receives the pyarrow.Table before writing
+    *,
+    asset_path=None,       # logical asset, see Running Transforms From a Host
+    schema_fields=None,    # e.g. [{"name": "total", "type": "double", "nullable": True}]
+    asset_id=None,
+)
+```
+
+write_data(data): accepts a pyarrow.Table or a DuckDB relation. Raises TypeError for anything else.
 
 ### BinaryOutput
 
@@ -222,6 +306,7 @@ BinaryOutput(
     path,
     name=None,
     description=None,
+    health_checks=None,
 )
 ```
 
@@ -236,10 +321,11 @@ SparkDFOutput(
     path,
     name=None,
     description=None,
+    health_checks=None,
 )
 ```
 
-write_data(df): calls df.write.parquet(path).
+write_data(df, mode="overwrite"): calls df.write.mode(mode).parquet(path).
 
 ### JsonOutput
 
@@ -250,8 +336,7 @@ JsonOutput(
     path,
     name=None,
     description=None,
-    health_checks=[],
-    schema_validation=None,
+    health_checks=None,
 )
 ```
 
@@ -266,14 +351,35 @@ DirectoryOutput(
     path,
     name=None,
     description=None,
+    health_checks=None,
 )
 ```
 
-write_data() raises NotImplementedError. Access the path via output.path.
+write_data() raises NotImplementedError. Access the path via output.path. Health checks do not
+run on their own: call output.check(output.path, "output") after filling the directory.
+
+### Custom handlers
+
+Subclass ABCInput and implement get_data(), or ABCOutput and implement write_data(). Call
+self.check(data, "input") or self.check(data, "output") to run the health checks.
+
+```python
+from simple_dag.datahandlers import ABCInput
+
+class TextInput(ABCInput):
+    asset_kind = "document"      # "file" (default), "table", "document" or "directory"
+    default_extension = ".txt"
+
+    def get_data(self):
+        with open(self.path) as f:
+            text = f.read()
+        self.check(text, "input")
+        return text
+```
 
 ## Health Checks
 
-A health check is any callable that accepts a single argument (the loaded data or data about to be written) and returns True if the check passes.
+A health check is any callable that accepts a single argument (the loaded data or data about to be written) and returns a truthy value if the check passes.
 
 ```python
 def has_salary_col(df):
@@ -283,11 +389,20 @@ PandasDFInput("data.csv", health_checks=[has_salary_col])
 PandasDFOutput("out.csv", health_checks=[has_salary_col])
 ```
 
-A failed health check raises: ValueError: "Health check failed for <path>: <function_name>"
-
 Health checks run:
 - For inputs: after data is loaded, before it is passed to the function.
 - For outputs: before the data is written to disk.
+
+Outcomes:
+- A check that returns a falsy value fails. A check that raises is logged and counts as an error.
+- All checks of a handler run. If one did not pass, the handler raises
+  ValueError: "Input checks failed for <path>: <function_name> (failed)" ("Output checks failed ..."
+  for outputs, "(error)" for a check that raised), and an output is not written.
+- `has_salary_col.severity = "warning"` records the outcome without stopping the transform.
+- `has_salary_col.check_id = "salary-column"` reports the check under another name.
+- handler.check_results holds one simple_dag.checks.CheckResult per check with check_id, status
+  ("passed", "failed" or "error"), stage ("input" or "output"), severity and duration_ms. A check may
+  also return a CheckResult itself.
 
 ## Direct Execution
 
@@ -426,6 +541,116 @@ simple_dag.configure(base="/data", storage_options={})  # same thing from code
   `list_files(pattern)` apply the same resolution; `list_files` returns base-relative results
   for relative patterns.
 - `PathInput` / `DirectoryInput` return the resolved path.
+
+## Running Transforms From a Host
+
+Optional building blocks for a scheduler or platform that describes transforms, stages their data
+and runs them. Transforms stay plain callables.
+
+### definition_manifest
+
+```python
+from simple_dag.definitions import definition_manifest, manifest_digest
+
+manifest = definition_manifest(transforms)   # list[Transform]
+digest = manifest_digest(manifest)           # sha256 hex, same definitions give the same digest
+```
+
+Returns plain data:
+
+```python
+{
+    "protocol": 1,
+    "transforms": [                          # sorted by name; duplicate names raise ValueError
+        {
+            "name": "summarize",
+            "source": {"path": "my_project/pipelines/revenue.py", "line": 12},
+            "inputs": {"orders": {...}},     # one binding per input
+            "outputs": {"revenue": {...}},   # one binding per output
+            "schedules": ["0 6 * * *"],
+            "timezone": "UTC",
+        }
+    ],
+}
+```
+
+A binding:
+
+```python
+{
+    "asset_id": None,
+    "asset_path": "/analytics/reports/revenue",
+    "path": "/analytics/reports/revenue",
+    "kind": "table",                         # "table", "document", "file" or "directory"
+    "format": "parquet",                     # "parquet", "csv", "json" or "binary"
+    "layout": "file",                        # "file", "dataset", "directory" or "pattern"
+    "handler": "simple_dag.datahandlers.arrow_handler.ArrowOutput",
+    "schema_fields": [{"name": "total", "type": "double", "nullable": True}],
+    "required_checks": ["has_rows"],         # ids of the blocking health checks
+}
+```
+
+### Logical assets
+
+- An absolute handler path ("/project/path") is reported as the binding's asset_path: a reference a
+  catalog resolves, not necessarily a place on disk.
+- handler.with_asset("/project/path", schema_fields=[...]) returns a copy of any handler tied to that
+  asset while it keeps reading or writing its own path.
+- Outputs and ArrowInput also accept asset_path=, schema_fields= and asset_id= as keyword-only
+  arguments.
+
+### Binding and executing
+
+```python
+from simple_dag.execution import ExecutionContext, execute
+
+inputs = {
+    name: declared.bind_files(staged_files[name], staging_root[name])
+    for name, declared in transform.inputs.items()
+}
+outputs = {
+    name: declared.bind_path(declared.output_path(output_root[name]))
+    for name, declared in transform.outputs.items()
+}
+context = ExecutionContext(
+    run_id, attempt_id, project_id, branch_id, environment_id,
+    parameters={}, configuration={"env": {"REGION": "CH"}}, secrets={"api_key": "..."},
+)
+execute(transform, context, inputs, outputs, emit=None)
+```
+
+- bind_path(path): copy of the handler at another path; reader options, Pydantic models and health
+  checks are kept.
+- bind_files(files, root): copy of an input reading files staged below root: the single file, the
+  directory of a multi-file dataset (ArrowInput, SparkDFInput), root for a DirectoryInput, the glob
+  for Multiple. Raises ValueError if a single-file input gets no or several files.
+- output_path(root): where an output writes below root: root/data.<ext> with the declared extension,
+  root itself for a DirectoryOutput. The host creates root.
+- execute runs a copy of the transform with the given bindings and returns the function's result.
+  The declared transform is not modified. Bindings must cover exactly the declared inputs and
+  outputs, otherwise ValueError. emit, if given, is called with a "started" and a "completed" event
+  ({"protocol": 1, "kind": ..., "run_id": ..., "attempt_id": ...}).
+- After the run, handler.check_results on the bound handlers hold the health check outcomes.
+
+### ExecutionContext
+
+A transform function that declares a ctx argument receives the context:
+
+```python
+@transform(out=JsonOutput("/project/report.json"))
+def report(ctx, out):
+    out.write_data({"region": ctx.env.get("REGION"), "run": ctx.run_id})
+```
+
+Fields: run_id, attempt_id, project_id, branch_id, environment_id, parameters (dict),
+configuration (dict), partition (dict), spark (Spark session or None), secrets (dict).
+ctx.env is a copy of configuration["env"]. secrets and spark are excluded from repr().
+
+When a transform is called directly (not through execute), ctx is the Spark session if PySpark is
+installed and None otherwise.
+
+`simple_dag.platform` (1.3.0) re-exports ArrowInput, ArrowOutput, CheckResult, evaluate_check,
+definition_manifest, manifest_digest, PROTOCOL_VERSION, ExecutionContext and execute.
 
 ## Complete Working Example
 

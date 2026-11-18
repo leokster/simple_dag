@@ -1,13 +1,14 @@
 simple_dag.datahandlers
 ========================
 
+Every handler is importable from ``simple_dag`` and from ``simple_dag.datahandlers``.
 
-Binary Data
------------
 
-.. automodule:: simple_dag.datahandlers.binary_handler
+Base classes
+------------
+
+.. automodule:: simple_dag.datahandlers.base_handler
    :members:
-   :undoc-members:
    :show-inheritance:
 
 
@@ -18,6 +19,57 @@ Pandas DataFrame
    :members:
    :undoc-members:
    :show-inheritance:
+
+
+Arrow Table
+-----------
+
+.. automodule:: simple_dag.datahandlers.arrow_handler
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+JSON
+----
+
+.. automodule:: simple_dag.datahandlers.json_handler
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+Binary Data
+-----------
+
+.. automodule:: simple_dag.datahandlers.binary_handler
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+Paths and Directories
+---------------------
+
+.. automodule:: simple_dag.datahandlers.filepath_handler
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: simple_dag.datahandlers.directory_handler
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+Multiple Files
+--------------
+
+.. automodule:: simple_dag.datahandlers.multiple
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 
 Spark DataFrame
 ---------------
