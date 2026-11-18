@@ -7,24 +7,15 @@ from pathlib import Path
 from types import ModuleType
 from typing import Callable
 
-from simple_dag.datahandlers.spark_handler import SparkDFInput
+from simple_dag.datahandlers.spark_handler import SPARK_INSTALLED, SparkDFInput
 from simple_dag.datahandlers.base_handler import ABCInput, ABCOutput
 
 logger = logging.getLogger("simple_dag")
 
-try:
-    from pyspark.sql import SparkSession
-
-    SPARK_INSTALLED = True
-except ImportError:
-    ImportWarning(
-        "PySpark not installed. If you want to use Spark please install it "
-        "with `pip install pyspark`"
-    )
-    SPARK_INSTALLED = False
-
 
 def get_spark():
+    from pyspark.sql import SparkSession
+
     spark = (
         SparkSession.builder.appName("news_gatherer")
         .master("local[*]")  # Use all available cores
@@ -52,12 +43,13 @@ def get_spark():
 
 
 class Transform:
-    compute_func: Callable = None
+    compute_func: Callable
     on_upstream_success: bool = False
     timezone: str | None = None
 
     def __init__(self, compute_func, *args, **kwargs) -> None:
         self.compute_func = compute_func
+        self.__name__ = getattr(compute_func, "__name__", type(compute_func).__name__)
         self.args = args
         self.kwargs = kwargs
 
@@ -105,7 +97,9 @@ class Transform:
             elif isinstance(val, ABCOutput):
                 parsed_kwargs[key] = val
 
-        if "ctx" in self.compute_func.__code__.co_varnames:
+        # co_varnames lists the arguments first, then the local variables.
+        code = self.compute_func.__code__
+        if "ctx" in code.co_varnames[: code.co_argcount + code.co_kwonlyargcount]:
             parsed_kwargs["ctx"] = ctx
 
         logger.info("Running transform %s", self.__name__)
@@ -127,14 +121,16 @@ class Transform:
 
 def transform(*args, **kwargs):
     def _inner(func):
-        trans = Transform(func, *args, **kwargs)
-        trans.__name__ = func.__name__
-        return trans
+        return Transform(func, *args, **kwargs)
 
     return _inner
 
 
-def schedule(cron: str = None, on_upstream_success: bool = False, timezone: str = None):
+def schedule(
+    cron: str | None = None,
+    on_upstream_success: bool = False,
+    timezone: str | None = None,
+):
     """Attach scheduling metadata to a transform.
 
     ``cron`` runs the transform on a cron expression (repeat the decorator or
@@ -188,7 +184,7 @@ def find_transform_instances_in_package(package: str | ModuleType):
             module = import_module(module_info.name)
             transforms += find_transform_instances_in_module(module)
 
-    unique = {}
+    unique: dict[int, Transform] = {}
     for instance in transforms:
         unique.setdefault(id(instance), instance)
     return list(unique.values())

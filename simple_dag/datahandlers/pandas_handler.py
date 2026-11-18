@@ -4,27 +4,23 @@ from simple_dag.datahandlers import base_handler
 from simple_dag.utils import fsspec
 
 
-def _execute_health_checks(path, df, health_checks):
-    for health_check in health_checks:
-        if not health_check(df):
-            raise ValueError(f"Health check failed for {path}: {health_check.__name__}")
-
-
 class PandasDFInput(base_handler.ABCInput):
-    def __init__(
-        self, path, *args, name=None, description=None, health_checks=[], **kwargs
-    ) -> None:
-        """
-        Pandas Dataframe Input Handler.
+    """Reads a CSV file into a pandas DataFrame.
 
-        Used to read data from pandas dataframes in simple_dag transforms.
-        """
-        self.path = path
-        self.name = name
-        self.description = description
+    Extra keyword arguments that ``pandas.read_csv`` knows, such as ``sep``, are
+    passed on to it.
+    """
+
+    asset_kind = "table"
+    data_format = "csv"
+    default_extension = ".csv"
+
+    def __init__(
+        self, path, *args, name=None, description=None, health_checks=None, **kwargs
+    ) -> None:
+        super().__init__(path, name, description, health_checks)
         self.args = args
         self.kwargs = kwargs
-        self.health_checks = health_checks
 
     def get_data(self):
         if self.path.endswith(".csv"):
@@ -36,7 +32,7 @@ class PandasDFInput(base_handler.ABCInput):
             with fsspec.open(self.path, "r") as f:
                 df = pd.read_csv(f, **pd_read_csv_kwargs)
 
-            _execute_health_checks(self.path, df, self.health_checks)
+            self.check(df, "input")
 
             return df
 
@@ -44,14 +40,14 @@ class PandasDFInput(base_handler.ABCInput):
 
 
 class PandasDFOutput(base_handler.ABCOutput):
-    def __init__(self, path, name=None, description=None, health_checks=[]) -> None:
-        self.path = path
-        self.name = name
-        self.description = description
-        self.health_checks = health_checks
+    """Writes a pandas DataFrame to a CSV file."""
+
+    asset_kind = "table"
+    data_format = "csv"
+    default_extension = ".csv"
 
     def write_data(self, df, *args, **kwargs):
-        _execute_health_checks(self.path, df, self.health_checks)
+        self.check(df, "output")
 
         with fsspec.open(self.path, "w") as f:
             df.to_csv(f, *args, **kwargs)

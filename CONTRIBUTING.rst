@@ -64,11 +64,12 @@ Ready to contribute? Here's how to set up `simple_dag` for local development.
 
     $ git clone git@github.com:your_name_here/simple_dag.git
 
-3. Install your local copy into a virtualenv. Assuming you have virtualenvwrapper installed, this is how you set up your fork for local development::
+3. Install your local copy into a virtualenv::
 
-    $ mkvirtualenv simple_dag
     $ cd simple_dag/
-    $ python setup.py develop
+    $ python -m venv .venv
+    $ source .venv/bin/activate
+    $ pip install -e '.[dev,arrow]'
 
 4. Create a branch for local development::
 
@@ -76,14 +77,12 @@ Ready to contribute? Here's how to set up `simple_dag` for local development.
 
    Now you can make your changes locally.
 
-5. When you're done making changes, check that your changes pass flake8 and the
-   tests, including testing other Python versions with tox::
+5. When you're done making changes, check that your changes pass flake8, black and
+   the tests, including testing other Python versions with tox::
 
-    $ flake8 simple_dag tests
-    $ python setup.py test or pytest
+    $ make lint
+    $ pytest
     $ tox
-
-   To get flake8 and tox, just pip install them into your virtualenv.
 
 6. Commit your changes and push your branch to GitHub::
 
@@ -102,27 +101,24 @@ Before you submit a pull request, check that it meets these guidelines:
 2. If the pull request adds functionality, the docs should be updated. Put
    your new functionality into a function with a docstring, and add the
    feature to the list in README.md.
-3. The pull request should work for Python 3.10, 3.11, 3.12, 3.13 and 3.14. Check
-   https://travis-ci.com/leokster/simple_dag/pull_requests
-   and make sure that the tests pass for all supported Python versions.
+3. The pull request should work for Python 3.10, 3.11, 3.12, 3.13 and 3.14.
 
 Tips
 ----
 
 To run a subset of tests::
 
-$ pytest tests.test_simple_dag
+$ pytest tests/test_storage.py
 
 
 Deploying
 ---------
 
 A reminder for the maintainers on how to deploy.
-Make sure all your changes are committed (including an entry in HISTORY.rst).
-Then run::
+Make sure all your changes are committed (including an entry in HISTORY.rst) and
+pushed to ``main``. Then publish a GitHub release with a new ``vX.Y.Z`` tag::
 
-$ bump2version patch # possible: major / minor / patch
-$ git push
-$ git push --tags
+$ gh release create vX.Y.Z --target main --title vX.Y.Z --notes "..."
 
-Travis will then deploy to PyPI if tests pass.
+The release workflow runs the tests and uploads the package to PyPI. The version
+is taken from the tag, there is nothing to bump in the code.

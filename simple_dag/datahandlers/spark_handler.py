@@ -1,3 +1,8 @@
+"""Spark handlers (experimental, might change in the future).
+
+PySpark is optional and not installed with simple_dag: ``pip install pyspark``.
+"""
+
 from simple_dag.datahandlers import base_handler
 
 try:
@@ -5,41 +10,41 @@ try:
 
     SPARK_INSTALLED = True
 except ImportError:
-    ImportWarning(
-        "PySpark not installed. If you want to use Spark please install it "
-        "with `pip install pyspark`"
-    )
     SPARK_INSTALLED = False
 
 
 class SparkDFInput(base_handler.ABCInput):
-    def __init__(self, path, name=None, description=None, health_checks=[]) -> None:
-        self.path = path
-        self.name = name
-        self.description = description
+    """Reads Parquet, JSON or CSV into a Spark DataFrame."""
 
-        Warning(
-            "Experimental: SparkDFInput is experimental and might change in the future."
-        )
+    storage_layout = "dataset"
+    asset_kind = "table"
+    data_format = "parquet"
+    default_extension = ".parquet"
 
-    def get_data(self, spark: "SparkSession"):
+    def get_data(self, spark: "SparkSession | None" = None):
+        """Read with a Spark session or a context carrying one as ``.spark``."""
+        spark = getattr(spark, "spark", spark)
+        if spark is None:
+            raise ValueError("SparkDFInput requires a Spark session")
+
         if self.path.endswith(".json"):
-            return spark.read.option("multiLine", "true").json(self.path)
-
-        if self.path.endswith(".parquet"):
-            return spark.read.parquet(self.path)
-
-        if self.path.endswith(".csv"):
-            return spark.read.csv(self.path, header=True, inferSchema=True)
-
-        raise ValueError(f"File extension not supported: {self.path}")
+            data = spark.read.option("multiLine", "true").json(self.path)
+        elif self.path.endswith(".csv"):
+            data = spark.read.csv(self.path, header=True, inferSchema=True)
+        else:
+            # A Parquet file or a directory of part files.
+            data = spark.read.parquet(self.path)
+        self.check(data, "input")
+        return data
 
 
 class SparkDFOutput(base_handler.ABCOutput):
-    def __init__(self, path, name=None, description=None, health_checks=[]) -> None:
-        self.path = path
-        self.name = name
-        self.description = description
+    """Writes a Spark DataFrame to Parquet."""
+
+    asset_kind = "table"
+    data_format = "parquet"
+    default_extension = ".parquet"
 
     def write_data(self, df, mode="overwrite"):
+        self.check(df, "output")
         df.write.mode(mode).parquet(self.path)

@@ -3,33 +3,38 @@ from simple_dag.utils import fsspec
 
 
 class Multiple(base_handler.ABCInput):
+    """Reads every file matching a glob pattern with the wrapped input.
+
+    The transform receives a list with one entry per file. The wrapped input is
+    rebound to each match, so its options and health checks apply to every file.
+    """
+
+    storage_layout = "pattern"
+
     def __init__(self, input_obj: base_handler.ABCInput) -> None:
-        self.path = input_obj.path
-        self.name = input_obj.name
-        self.description = input_obj.description
-        if hasattr(input_obj, "args"):
-            self.args = input_obj.args
-        else:
-            self.args = ()
-        if hasattr(input_obj, "kwargs"):
-            self.kwargs = input_obj.kwargs
-        else:
-            self.kwargs = {}
-        if hasattr(input_obj, "health_checks"):
+        super().__init__(
+            input_obj.path,
+            input_obj.name,
+            input_obj.description,
+            asset_path=input_obj.asset_path,
+        )
+        self.asset_kind = input_obj.asset_kind
+        self.data_format = input_obj.data_format
+        self.template = input_obj.bind_path(input_obj.path)
+
+        # For subclasses that still construct one input per file themselves.
+        self.input_cls = input_obj.__class__
+        self.args = getattr(input_obj, "args", ())
+        self.kwargs = dict(getattr(input_obj, "kwargs", {}))
+        if input_obj.health_checks is not base_handler.DataHandler.health_checks:
             self.kwargs["health_checks"] = input_obj.health_checks
 
-        self.input_cls = input_obj.__class__
+    def _inputs(self) -> list[base_handler.ABCInput]:
+        # self.path contains wildcards e.g. /path/to/data/*.csv
+        return [self.template.bind_path(file) for file in fsspec.list_files(self.path)]
 
     def get_data(self):
-        # self.path contains wildcards e.g. /path/to/data/*.csv
-        # we need to use fsspec to get the list of files
-        files = fsspec.list_files(self.path)
-        input_objs = []
-        for file in files:
-            input_obj = self.input_cls(file, *self.args, **self.kwargs)
-            input_objs.append(input_obj)
-
-        return [input_obj.get_data() for input_obj in input_objs]
+        return [input_obj.get_data() for input_obj in self._inputs()]
 
 
 class LengthAwareIterator:
@@ -46,9 +51,7 @@ class LengthAwareIterator:
 
 
 class MultipleIterator(Multiple):
+    """Like ``Multiple``, but reads each file only when it is iterated over."""
 
     def get_data(self):
-        files = fsspec.list_files(self.path)
-        inputs = [self.input_cls(file, *self.args, **self.kwargs) for file in files]
-
-        return LengthAwareIterator(inputs)
+        return LengthAwareIterator(self._inputs())

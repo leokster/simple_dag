@@ -1,41 +1,36 @@
 import json
-from typing import Type
-from simple_dag.utils import fsspec
 
 from pydantic import BaseModel
 
 from simple_dag.datahandlers import base_handler
-
-
-def _execute_health_checks(path, df, health_checks):
-    for health_check in health_checks:
-        if not health_check(df):
-            raise ValueError(f"Health check failed for {path}: {health_check.__name__}")
+from simple_dag.utils import fsspec
 
 
 class JsonInput(base_handler.ABCInput):
+    """Reads a JSON file, optionally validated against a pydantic model.
+
+    With ``schema_validation`` the transform receives the validated model, or the
+    plain parsed JSON if ``return_pydantic_model`` is False.
+    """
+
+    asset_kind = "document"
+    data_format = "json"
+    default_extension = ".json"
+
     def __init__(
         self,
         path,
         *args,
         name=None,
         description=None,
-        health_checks=[],
-        schema_validation: Type[BaseModel] = None,
+        health_checks=None,
+        schema_validation: type[BaseModel] | None = None,
         return_pydantic_model=True,
         **kwargs,
     ) -> None:
-        """
-        Pandas Dataframe Input Handler.
-
-        Used to read data from pandas dataframes in simple_dag transforms.
-        """
-        self.path = path
-        self.name = name
-        self.description = description
+        super().__init__(path, name, description, health_checks)
         self.args = args
         self.kwargs = kwargs
-        self.health_checks = health_checks
         self.schema_validation = schema_validation
         self.return_pydantic_model = return_pydantic_model
 
@@ -51,7 +46,7 @@ class JsonInput(base_handler.ABCInput):
                 pydantic_data = self.schema_validation.model_validate(data)
 
             if pydantic_data is not None and self.return_pydantic_model:
-                _execute_health_checks(self.path, pydantic_data, self.health_checks)
+                self.check(pydantic_data, "input")
                 return pydantic_data
 
             elif not self.return_pydantic_model and pydantic_data is None:
@@ -60,25 +55,29 @@ class JsonInput(base_handler.ABCInput):
                     f"in {self.path}"
                 )
 
-            _execute_health_checks(self.path, data, self.health_checks)
+            self.check(data, "input")
             return data
 
         raise ValueError(f"File extension not supported: {self.path}, only .json")
 
 
 class JsonOutput(base_handler.ABCOutput):
+    """Writes a dict, a list or a pydantic model to a JSON file."""
+
+    asset_kind = "document"
+    data_format = "json"
+    default_extension = ".json"
+
     def __init__(
         self,
         path,
         name=None,
         description=None,
-        health_checks=[],
+        health_checks=None,
         schema_validation=None,
+        **asset_options,
     ) -> None:
-        self.path = path
-        self.name = name
-        self.description = description
-        self.health_checks = health_checks
+        super().__init__(path, name, description, health_checks, **asset_options)
         self.schema_validation = schema_validation
 
     def write_data(self, data, *args, **kwargs):
@@ -94,7 +93,7 @@ class JsonOutput(base_handler.ABCOutput):
                 "only pydantic models and dicts/lists"
             )
 
-        _execute_health_checks(self.path, data, self.health_checks)
+        self.check(data, "output")
 
         with fsspec.open(self.path, "w") as f:
             json.dump(json_data, f, indent=2, *args, **kwargs)

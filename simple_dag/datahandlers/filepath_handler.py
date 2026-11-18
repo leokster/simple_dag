@@ -3,14 +3,16 @@ from simple_dag.datahandlers import base_handler
 
 
 class PathInput(base_handler.ABCInput):
+    """Hands the resolved path to the transform without reading anything."""
+
     def __init__(
-        self, path, *args, name=None, description=None, health_checks=[], **kwargs
+        self, path, *args, name=None, description=None, health_checks=None, **kwargs
     ) -> None:
-        self.path = path
-        self.name = name
-        self.description = description
+        super().__init__(path, name, description, health_checks)
         self.args = args
         self.kwargs = kwargs
 
     def get_data(self):
-        return storage.resolve(self.path)
+        path = storage.resolve(self.path)
+        self.check(path, "input")
+        return path
